@@ -1,0 +1,26 @@
+{
+  "editor.tabSize": 2,
+  // Chỉ tắt SQL validation cho project này
+  // (không ảnh hưởng đến các project khác)
+  "sql.validate.enable": false,
+  
+  // // Tắt SQL language server cho workspace này
+  // "sql.languageServerEnabled": false,
+  
+  // Tắt diagnostics (linter) cho các file SQL trong migrations
+  "files.associations": {
+    "**/migrations/**/*.sql": "plaintext"
+  },
+  
+  // // Cấu hình cho SQL files trong project này
+  // "[sql]": {
+  //   "editor.formatOnSave": false,
+  //   "editor.defaultFormatter": null,
+  //   "editor.codeActionsOnSave": {
+  //     "source.fixAll": "explicit"
+  //   }
+  // },
+  
+  // // Tắt diagnostics cho file SQL trong thư mục migrations
+  // "diagnostics.disableLanguages": ["sql"]
+}
