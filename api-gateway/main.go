@@ -1,0 +1,37 @@
+package main
+
+import (
+	"log"
+	"os"
+
+	"github.com/hmquannnnn/e-commerce/api-gateway/internal/routes"
+	"github.com/joho/godotenv"
+)
+
+func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("Warning: No .env file found")
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	userServiceURL := os.Getenv("USER_SERVICE_URL")
+	if userServiceURL == "" {
+		log.Fatal("USER_SERVICE_URL is required")
+	}
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET is required")
+	}
+
+	r := routes.SetupRouter(userServiceURL, jwtSecret)
+
+	log.Printf("API Gateway running on port %s", port)
+	if err := r.Run(":" + port); err != nil {
+		log.Fatalf("Failed to run server: %v", err)
+	}
+}
