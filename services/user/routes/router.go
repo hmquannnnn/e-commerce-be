@@ -12,20 +12,17 @@ import (
 type Router struct {
 	authHandler    *handler.AuthHandler
 	userHandler    *handler.UserHandler
-	fileHandler    *handler.FileHandler
 	authMiddleware *AuthMiddleware
 }
 
 func NewRouter(
 	authService service.AuthService,
 	userService service.UserService,
-	fileService service.FileService,
 	jwtManager *util.JWTManager,
 ) *Router {
 	return &Router{
 		authHandler:    handler.NewAuthHandler(authService, userService, jwtManager),
 		userHandler:    handler.NewUserHandler(userService),
-		fileHandler:    handler.NewFileHandler(fileService),
 		authMiddleware: NewAuthMiddleware(jwtManager),
 	}
 }
@@ -34,7 +31,6 @@ func (router *Router) SetupRoutes() *gin.Engine {
 	r := gin.Default()
 
 	r.Use(RequestIDMiddleware())
-	r.Use(CORSMiddleware())
 
 	r.GET("/health", router.healthCheck)
 	r.GET("/api/health", router.healthCheck)
@@ -61,12 +57,6 @@ func (router *Router) SetupRoutes() *gin.Engine {
 		users.Use(router.authMiddleware.RequireAuth())
 		{
 			users.PATCH("/profile", router.userHandler.UpdateProfile)
-		}
-
-		files := v1.Group("/files")
-		files.Use(router.authMiddleware.RequireAuth())
-		{
-			files.POST("/presigned-url", router.fileHandler.GetPresignedUploadURL)
 		}
 	}
 

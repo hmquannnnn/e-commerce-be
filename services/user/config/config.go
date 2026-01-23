@@ -18,7 +18,6 @@ type AppConfig struct {
 	Name        string
 	Environment string
 	Port        string
-	LogLevel    string
 }
 
 type DatabaseConfig struct {
@@ -52,7 +51,6 @@ func Load() (*Config, error) {
 			Name:        getEnv("APP_NAME", "user-service"),
 			Environment: getEnv("APP_ENV", "development"),
 			Port:        getEnv("APP_PORT", "50051"),
-			LogLevel:    getEnv("LOG_LEVEL", "info"),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),

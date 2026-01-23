@@ -9,7 +9,6 @@ import (
 	"github.com/hmquannnnn/e-commerce/pkg/storage"
 )
 
-// FileService handles file upload operations
 type FileService interface {
 	GetPresignedUploadURL(ctx context.Context, fileType, contentType string) (PresignedUploadResponse, error)
 }
