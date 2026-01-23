@@ -9,18 +9,18 @@ import (
 )
 
 // SetupRouter configures all routes for the API Gateway
-// userServiceURL: URL of the user service (e.g., "http://localhost:8081")
-func SetupRouter(userServiceURL string, jwtSecret string) *gin.Engine {
+func SetupRouter(userServiceURL string, fileServiceURL string, jwtSecret string) *gin.Engine {
 	r := gin.Default()
 
 	// Global middlewares
-	// Note: CORS, Request ID, Logging can be added here if needed
+	r.Use(middleware.CORSMiddleware())
 
 	// Health check endpoint
 	r.GET("/health", healthCheck)
 	r.GET("/api/health", healthCheck)
 
 	userServiceReverseProxy := proxy.NewReverseProxy(userServiceURL)
+	fileServiceReverseProxy := proxy.NewReverseProxy(fileServiceURL)
 
 	// API v1 group
 	v1 := r.Group("/api")
@@ -57,7 +57,7 @@ func SetupRouter(userServiceURL string, jwtSecret string) *gin.Engine {
 			// Route: POST /api/files/presigned-url
 			files := protected.Group("/files")
 			{
-				files.Any("/*path", userServiceReverseProxy)
+				files.Any("/*path", fileServiceReverseProxy)
 			}
 		}
 	}

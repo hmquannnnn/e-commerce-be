@@ -38,7 +38,6 @@ func NewManager(minioClient *minio.Client) *Manager {
 		},
 	}
 }
-
 func (m *Manager) UploadImage(
 	ctx context.Context,
 	bucketName string,
