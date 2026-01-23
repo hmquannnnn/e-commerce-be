@@ -6,14 +6,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/hmquannnnn/e-commerce/file-service/config"
+	"github.com/hmquannnnn/e-commerce/file-service/routes"
+	"github.com/hmquannnnn/e-commerce/file-service/service"
 	commonstorage "github.com/hmquannnnn/e-commerce/pkg/storage"
 	commonminio "github.com/hmquannnnn/e-commerce/pkg/storage/minio"
-	"github.com/hmquannnnn/e-commerce/user-service/config"
-	"github.com/hmquannnnn/e-commerce/user-service/internal/db"
-	"github.com/hmquannnnn/e-commerce/user-service/internal/util"
-	"github.com/hmquannnnn/e-commerce/user-service/repository"
-	"github.com/hmquannnnn/e-commerce/user-service/routes"
-	"github.com/hmquannnnn/e-commerce/user-service/service"
 	"github.com/joho/godotenv"
 )
 
@@ -30,26 +27,16 @@ func runServer() {
 
 	log.Printf("Starting %s in %s mode...", cfg.App.Name, cfg.App.Environment)
 
-	// Initialize database connection
-	database, err := db.NewPostgresDB(cfg)
-	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
-	}
-	defer database.Close()
-	log.Println("✓ Database connected successfully")
-
-	// Note: Redis cache removed for simplicity. You can add it later when learning about caching.
-	// See internal/cache/redis.go for example implementation
-
 	// Initialize MinIO client
 	minioConfig := commonminio.NewConfigFromEnv()
+	log.Println("minioConfig", minioConfig)
 	minioClient, err := commonminio.NewClient(minioConfig)
 	if err != nil {
 		log.Fatalf("Failed to initialize MinIO: %v", err)
 	}
 
 	// Ensure bucket exists
-	bucketName := "user-service-files"
+	bucketName := cfg.Storage.BucketName
 	if err := minioClient.EnsureBucket(context.Background(), bucketName); err != nil {
 		log.Fatalf("Failed to ensure bucket exists: %v", err)
 	}
@@ -59,34 +46,15 @@ func runServer() {
 	storageManager := commonstorage.NewManager(minioClient)
 	log.Println("✓ Storage manager initialized")
 
-	// Initialize JWT manager
-	jwtManager := util.NewJWTManager(
-		cfg.JWT.SecretKey,
-		cfg.JWT.AccessTokenDuration,
-		cfg.JWT.RefreshTokenDuration,
-	)
-	log.Println("✓ JWT manager initialized")
-
-	// Initialize repositories
-	userRepo := repository.NewUserRepository(database)
-	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
-	log.Println("✓ Repositories initialized")
-
 	// Initialize services
-	authService := service.NewAuthService(
-		userRepo,
-		refreshTokenRepo,
-		jwtManager,
-	)
-	userService := service.NewUserService(
-		userRepo,
+	fileService := service.NewFileService(
 		storageManager,
 		bucketName,
 	)
 	log.Println("✓ Services initialized")
 
 	// Initialize router
-	router := routes.NewRouter(authService, userService, jwtManager)
+	router := routes.NewRouter(fileService, cfg.JWT.SecretKey)
 	handler := router.SetupRoutes()
 	log.Println("✓ Routes configured")
 

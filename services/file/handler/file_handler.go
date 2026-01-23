@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hmquannnnn/e-commerce/user-service/service"
+	"github.com/hmquannnnn/e-commerce/file-service/service"
 )
 
 type FileHandler struct {
