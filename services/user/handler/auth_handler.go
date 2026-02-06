@@ -28,6 +28,7 @@ func NewAuthHandler(authService service.AuthService, userService service.UserSer
 
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req RegisterRequest
+	fmt.Println("req", req)
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -46,17 +47,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	ip := c.ClientIP()
-	userAgent := c.GetHeader("User-Agent")
-
 	user, accessToken, refreshToken, err := h.authService.Register(
 		c.Request.Context(),
 		service.RegisterParams{
-			Email:     req.Email,
-			Password:  req.Password,
-			Name:      req.Name,
-			IP:        ip,
-			UserAgent: userAgent,
+			Email:    req.Email,
+			Password: req.Password,
+			Name:     req.Name,
 		},
 	)
 
@@ -78,7 +74,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			"access_token":  accessToken,
 			"refresh_token": refreshToken,
 			"token_type":    "Bearer",
-			"user":          ToUserResponse(user, h.userService.GetPublicURL),
+			"user":          ToUserResponse(user),
 		},
 	})
 }
@@ -94,15 +90,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	ip := c.ClientIP()
-	userAgent := c.GetHeader("User-Agent")
-
 	user, accessToken, refreshToken, err := h.authService.Login(
 		c.Request.Context(),
 		req.Email,
 		req.Password,
-		ip,
-		userAgent,
 	)
 
 	if err != nil {
@@ -122,7 +113,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			"access_token":  accessToken,
 			"refresh_token": refreshToken,
 			"token_type":    "Bearer",
-			"user":          ToUserResponse(user, h.userService.GetPublicURL),
+			"user":          ToUserResponse(user),
 		},
 	})
 }
@@ -226,6 +217,6 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "User retrieved successfully",
-		"data":    ToUserResponse(user, h.userService.GetPublicURL),
+		"data":    ToUserResponse(user),
 	})
 }

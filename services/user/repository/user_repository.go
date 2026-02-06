@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/hmquannnnn/e-commerce/pkg/common/utils"
@@ -22,8 +21,6 @@ type UserRepository interface {
 	Create(ctx context.Context, user *model.User) error
 
 	Update(ctx context.Context, id uuid.UUID, params *model.UpdateUserParams) error
-
-	UpdateAvatar(ctx context.Context, id uuid.UUID, avatarUrl string) error
 
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 
@@ -43,16 +40,15 @@ func NewUserRepository(db *sql.DB) UserRepository {
 func (r *userRepository) Create(ctx context.Context, user *model.User) error {
 	query := `
 		INSERT INTO users (
-			id, email, phone, password_hash, name, avatar_url,
-			date_of_birth, gender, role,
+			id, email, phone, password_hash, name, role,
 			created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 
 	_, err := r.db.ExecContext(
 		ctx, query,
 		user.ID, user.Email, user.Phone, user.PasswordHash, user.Name,
-		user.AvatarURL, user.DateOfBirth, user.Gender, user.Role,
+		user.Role,
 		user.CreatedAt, user.UpdatedAt,
 	)
 
@@ -81,18 +77,6 @@ func (r *userRepository) Update(ctx context.Context, id uuid.UUID, params *model
 
 	if params.Phone != nil {
 		updates["phone"] = *params.Phone
-	}
-
-	if params.AvatarURL != nil {
-		updates["avatar_url"] = *params.AvatarURL
-	}
-
-	if params.DateOfBirth != nil {
-		updates["date_of_birth"] = *params.DateOfBirth
-	}
-
-	if params.Gender != nil {
-		updates["gender"] = *params.Gender
 	}
 
 	// Execute patch update using common utils
@@ -126,22 +110,6 @@ func isDuplicateEmail(err error) bool {
 		err.Error() == "ERROR: duplicate key value violates unique constraint \"users_email_key\"")
 }
 
-func (r *userRepository) UpdateAvatar(ctx context.Context, id uuid.UUID, avatarUrl string) error {
-	query := `
-		UPDATE users SET
-			avatar_url = $1,
-			updated_at = $2
-		WHERE id = $3
-	`
-
-	_, err := r.db.ExecContext(ctx, query, avatarUrl, time.Now(), id)
-	if err != nil {
-		return fmt.Errorf("failed to update avatar: %w", err)
-	}
-
-	return nil
-}
-
 func (r *userRepository) getOneByField(
 	ctx context.Context,
 	field string,
@@ -158,7 +126,7 @@ func (r *userRepository) getOneByField(
 	}
 
 	query := fmt.Sprintf(`
-        SELECT id, email, phone, name, avatar_url, date_of_birth, gender, role, password_hash, 
+        SELECT id, email, phone, name, role, password_hash, 
         created_at, updated_at
         FROM users
         WHERE %s = $1
@@ -170,9 +138,6 @@ func (r *userRepository) getOneByField(
 		&user.Email,
 		&user.Phone,
 		&user.Name,
-		&user.AvatarURL,
-		&user.DateOfBirth,
-		&user.Gender,
 		&user.Role,
 		&user.PasswordHash,
 		&user.CreatedAt,
