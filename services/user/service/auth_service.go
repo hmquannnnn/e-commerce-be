@@ -15,18 +15,16 @@ import (
 // AuthService handles authentication-related operations
 type AuthService interface {
 	Register(ctx context.Context, params RegisterParams) (*model.User, string, string, error)
-	Login(ctx context.Context, email, password, ip, userAgent string) (*model.User, string, string, error)
+	Login(ctx context.Context, email, password string) (*model.User, string, string, error)
 	RefreshToken(ctx context.Context, refreshToken string) (string, error)
 	Logout(ctx context.Context, userID uuid.UUID) error
 }
 
 // RegisterParams represents parameters for user registration
 type RegisterParams struct {
-	Email     string
-	Password  string
-	Name      string
-	IP        string
-	UserAgent string
+	Email    string
+	Password string
+	Name     string
 }
 
 type authService struct {
@@ -74,8 +72,7 @@ func (s *authService) Register(ctx context.Context, params RegisterParams) (*mod
 		Name:         params.Name,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
-		Role:         model.RoleUser,
-		Gender:       model.GenderMale,
+		Role:         model.RoleCustomer,
 	}
 
 	if err := s.userRepo.Create(ctx, user); err != nil {
@@ -97,7 +94,7 @@ func (s *authService) Register(ctx context.Context, params RegisterParams) (*mod
 }
 
 // Login handles user login
-func (s *authService) Login(ctx context.Context, email, password, ip, userAgent string) (*model.User, string, string, error) {
+func (s *authService) Login(ctx context.Context, email, password string) (*model.User, string, string, error) {
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {

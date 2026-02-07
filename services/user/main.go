@@ -1,13 +1,10 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"time"
 
-	commonstorage "github.com/hmquannnnn/e-commerce/pkg/storage"
-	commonminio "github.com/hmquannnnn/e-commerce/pkg/storage/minio"
 	"github.com/hmquannnnn/e-commerce/user-service/config"
 	"github.com/hmquannnnn/e-commerce/user-service/internal/db"
 	"github.com/hmquannnnn/e-commerce/user-service/internal/util"
@@ -41,24 +38,6 @@ func runServer() {
 	// Note: Redis cache removed for simplicity. You can add it later when learning about caching.
 	// See internal/cache/redis.go for example implementation
 
-	// Initialize MinIO client
-	minioConfig := commonminio.NewConfigFromEnv()
-	minioClient, err := commonminio.NewClient(minioConfig)
-	if err != nil {
-		log.Fatalf("Failed to initialize MinIO: %v", err)
-	}
-
-	// Ensure bucket exists
-	bucketName := "user-service-files"
-	if err := minioClient.EnsureBucket(context.Background(), bucketName); err != nil {
-		log.Fatalf("Failed to ensure bucket exists: %v", err)
-	}
-	log.Println("✓ MinIO connected successfully")
-
-	// Initialize storage manager
-	storageManager := commonstorage.NewManager(minioClient)
-	log.Println("✓ Storage manager initialized")
-
 	// Initialize JWT manager
 	jwtManager := util.NewJWTManager(
 		cfg.JWT.SecretKey,
@@ -80,8 +59,6 @@ func runServer() {
 	)
 	userService := service.NewUserService(
 		userRepo,
-		storageManager,
-		bucketName,
 	)
 	log.Println("✓ Services initialized")
 

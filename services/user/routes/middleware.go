@@ -150,12 +150,6 @@ func (m *AuthMiddleware) RequireAdmin() gin.HandlerFunc {
 	return m.RequireRole(model.RoleAdmin)
 }
 
-// RequireSeller is a Gin middleware that requires seller role (or admin)
-// Note: This should be used AFTER RequireAuth middleware
-func (m *AuthMiddleware) RequireSeller() gin.HandlerFunc {
-	return m.RequireRole(model.RoleSeller, model.RoleAdmin)
-}
-
 // OptionalAuth is a Gin middleware that optionally authenticates the user
 // If token is present and valid, it adds user info to context
 // If token is missing or invalid, it continues without error

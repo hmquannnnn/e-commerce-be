@@ -4,10 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/hmquannnnn/e-commerce/pkg/storage"
 	"github.com/hmquannnnn/e-commerce/user-service/model"
 	"github.com/hmquannnnn/e-commerce/user-service/repository"
 )
@@ -17,34 +15,24 @@ type UserService interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*model.User, error)
 	UpdateUser(ctx context.Context, id uuid.UUID, params UpdateUserParams) (*model.User, error)
-	GetPublicURL(filePath string) string
 }
 
 // UpdateUserParams represents parameters for updating a user
 type UpdateUserParams struct {
-	Name        *string
-	Phone       *string
-	AvatarURL   *string
-	DateOfBirth *time.Time
-	Gender      *model.Gender
+	Name  *string
+	Phone *string
 }
 
 type userService struct {
-	userRepo       repository.UserRepository
-	storageManager *storage.Manager
-	bucketName     string
+	userRepo repository.UserRepository
 }
 
 // NewUserService creates a new user service
 func NewUserService(
 	userRepo repository.UserRepository,
-	storageManager *storage.Manager,
-	bucketName string,
 ) UserService {
 	return &userService{
-		userRepo:       userRepo,
-		storageManager: storageManager,
-		bucketName:     bucketName,
+		userRepo: userRepo,
 	}
 }
 
@@ -76,11 +64,8 @@ func (s *userService) GetUserByEmail(ctx context.Context, email string) (*model.
 func (s *userService) UpdateUser(ctx context.Context, id uuid.UUID, params UpdateUserParams) (*model.User, error) {
 	// Convert service params to model params
 	modelParams := &model.UpdateUserParams{
-		Name:        params.Name,
-		Phone:       params.Phone,
-		AvatarURL:   params.AvatarURL,
-		DateOfBirth: params.DateOfBirth,
-		Gender:      params.Gender,
+		Name:  params.Name,
+		Phone: params.Phone,
 	}
 
 	// Use Update method with dynamic field updates
@@ -105,9 +90,4 @@ func (s *userService) UpdateUser(ctx context.Context, id uuid.UUID, params Updat
 	_ = cacheKey // TODO: Implement cache invalidation
 
 	return user, nil
-}
-
-// GetPublicURL generates full URL from filePath
-func (s *userService) GetPublicURL(filePath string) string {
-	return s.storageManager.GetPublicURL(filePath)
 }

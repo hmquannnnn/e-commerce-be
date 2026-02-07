@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hmquannnnn/e-commerce/user-service/service"
@@ -40,27 +39,9 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// Parse date_of_birth from string to time.Time
-	var dateOfBirth *time.Time
-	if req.DateOfBirth != nil && *req.DateOfBirth != "" {
-		parsed, err := time.Parse("2006-01-02", *req.DateOfBirth)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"success": false,
-				"error":   "INVALID_REQUEST",
-				"message": "Invalid date_of_birth format. Expected format: YYYY-MM-DD",
-			})
-			return
-		}
-		dateOfBirth = &parsed
-	}
-
 	user, err := h.userService.UpdateUser(c.Request.Context(), userID, service.UpdateUserParams{
-		Name:        req.Name,
-		Phone:       req.Phone,
-		AvatarURL:   req.AvatarURL,
-		DateOfBirth: dateOfBirth,
-		Gender:      req.Gender,
+		Name:  req.Name,
+		Phone: req.Phone,
 	})
 
 	if err != nil {
@@ -83,6 +64,6 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "Profile updated successfully",
-		"data":    ToUserResponse(user, h.userService.GetPublicURL),
+		"data":    ToUserResponse(user),
 	})
 }
