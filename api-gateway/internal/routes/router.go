@@ -9,7 +9,7 @@ import (
 )
 
 // SetupRouter configures all routes for the API Gateway
-func SetupRouter(userServiceURL string, fileServiceURL string, jwtSecret string) *gin.Engine {
+func SetupRouter(userServiceURL string, fileServiceURL string, productServiceURL string, jwtSecret string) *gin.Engine {
 	r := gin.Default()
 
 	// Global middlewares
@@ -21,7 +21,7 @@ func SetupRouter(userServiceURL string, fileServiceURL string, jwtSecret string)
 
 	userServiceReverseProxy := proxy.NewReverseProxy(userServiceURL)
 	fileServiceReverseProxy := proxy.NewReverseProxy(fileServiceURL)
-
+	productServiceReverseProxy := proxy.NewReverseProxy(productServiceURL)
 	// API v1 group
 	v1 := r.Group("/api")
 	{
@@ -58,6 +58,13 @@ func SetupRouter(userServiceURL string, fileServiceURL string, jwtSecret string)
 			files := protected.Group("/files")
 			{
 				files.Any("/*path", fileServiceReverseProxy)
+			}
+
+			// Product management routes
+			// Route: POST /api/products/create
+			products := protected.Group("/products")
+			{
+				products.Any("/*path", productServiceReverseProxy)
 			}
 		}
 	}

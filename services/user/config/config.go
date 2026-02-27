@@ -50,11 +50,11 @@ func Load() (*Config, error) {
 		App: AppConfig{
 			Name:        getEnv("APP_NAME", "user-service"),
 			Environment: getEnv("APP_ENV", "development"),
-			Port:        getEnv("APP_PORT", "50051"),
+			Port:        getEnv("APP_PORT", "8081"),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnvAsInt("DB_PORT", 5432),
+			Port:     getEnvAsInt("DB_PORT", 5433),
 			User:     getEnv("DB_USER", "postgres"),
 			Password: getEnv("DB_PASSWORD", "postgres"),
 			DBName:   getEnv("DB_NAME", "user_db"),

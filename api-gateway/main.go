@@ -28,12 +28,17 @@ func main() {
 		log.Fatal("FILE_SERVICE_URL is required")
 	}
 
+	productServiceURL := os.Getenv("PRODUCT_SERVICE_URL")
+	if productServiceURL == "" {
+		log.Fatal("PRODUCT_SERVICE_URL is required")
+	}
+
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		log.Fatal("JWT_SECRET is required")
 	}
 
-	r := routes.SetupRouter(userServiceURL, fileServiceURL, jwtSecret)
+	r := routes.SetupRouter(userServiceURL, fileServiceURL, productServiceURL, jwtSecret)
 
 	log.Printf("API Gateway running on port %s", port)
 	if err := r.Run(":" + port); err != nil {
