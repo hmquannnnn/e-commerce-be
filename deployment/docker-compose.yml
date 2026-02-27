@@ -4,7 +4,7 @@ services:
   # PostgreSQL for User Service
   postgres-user:
     image: postgres:15-alpine
-    container_name: ecommerce-postgres-user
+    container_name: uav-store-postgres-user
     environment:
       POSTGRES_DB: user_db
       POSTGRES_USER: postgres
@@ -16,7 +16,28 @@ services:
       - postgres-user-data:/var/lib/postgresql/data
       - ./initdb:/docker-entrypoint-initdb.d
     networks:
-      - ecommerce-network
+      - uav-store-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-product:
+    image: postgres:15-alpine
+    container_name: uav-store-postgres-product
+    environment:
+      POSTGRES_DB: product_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-product-data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d
+    networks:
+      - uav-store-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -25,7 +46,7 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: ecommerce-minio
+    container_name: uav-store-minio
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -40,11 +61,9 @@ services:
 volumes:
   postgres-user-data:
     driver: local
-  redis-data:
-    driver: local
-  rabbitmq-data:
+  postgres-product-data:
     driver: local
 
 networks:
-  ecommerce-network:
+  uav-store-network:
     driver: bridge
