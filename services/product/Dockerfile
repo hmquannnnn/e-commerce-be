@@ -1,17 +1,23 @@
 FROM golang:1.24-alpine AS builder
 
-WORKDIR /app
+RUN apk add --no-cache git ca-certificates
 
-# Copy root module files for the shared package
+WORKDIR /workspace
+
 COPY go.mod go.sum ./
+
 COPY pkg/ ./pkg/
 
-# Copy service module
+COPY services/product/go.mod services/product/go.sum ./services/product/
+
+WORKDIR /workspace/services/product
+RUN go mod download
+
+WORKDIR /workspace
 COPY services/product/ ./services/product/
 
-WORKDIR /app/services/product
+WORKDIR /workspace/services/product
 
-RUN go mod download
 RUN go build -o /bin/product-service main.go
 
 FROM alpine:3.20
@@ -22,6 +28,6 @@ WORKDIR /app
 
 COPY --from=builder /bin/product-service .
 
-EXPOSE 8082
+EXPOSE 8083
 
 CMD ["./product-service"]
