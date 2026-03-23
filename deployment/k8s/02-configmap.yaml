@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: uav-store-config
+  namespace: uav-store
+data:
+  # Database
+  DB_USER: postgres
+  DB_SSL_MODE: disable
+
+  # App
+  APP_ENV: production
+
+  # local = chạy migration qua init container
+  # production = migration do CI/CD Job xử lý
+  ENV: local
+
+  # Internal K8s DNS — format: <service-name>.<namespace>.svc.cluster.local
+  USER_SERVICE_URL: http://user-service.uav-store.svc.cluster.local:8081
+  FILE_SERVICE_URL: http://file-service.uav-store.svc.cluster.local:8082
+  PRODUCT_SERVICE_URL: http://product-service.uav-store.svc.cluster.local:8083
+
+  # MinIO (file-service dùng qua pkg/storage/minio NewConfigFromEnv)
+  MINIO_ENDPOINT: minio.uav-store.svc.cluster.local:9000
+  MINIO_USE_SSL: "false"
+  MINIO_REGION: us-east-1
+  STORAGE_BUCKET_NAME: uav-store

@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: file-service
+  namespace: uav-store
+  labels:
+    app: file-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: file-service
+  template:
+    metadata:
+      labels:
+        app: file-service
+    spec:
+      initContainers:
+        - name: wait-for-minio
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z minio.uav-store.svc.cluster.local 9000; do
+                echo "Waiting for minio..."; sleep 2;
+              done
+              echo "minio is ready"
+      containers:
+        - name: file-service
+          image: file-service:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8082
+          env:
+            - name: APP_PORT
+              value: "8082"
+            - name: APP_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: uav-store-config
+                  key: APP_ENV
+            - name: STORAGE_BUCKET_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: uav-store-config
+                  key: STORAGE_BUCKET_NAME
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: uav-store-config
+                  key: MINIO_ENDPOINT
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: uav-store-secrets
+                  key: minio-root-user
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: uav-store-secrets
+                  key: minio-root-password
+            - name: MINIO_USE_SSL
+              valueFrom:
+                configMapKeyRef:
+                  name: uav-store-config
+                  key: MINIO_USE_SSL
+            - name: MINIO_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: uav-store-config
+                  key: MINIO_REGION
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: uav-store-secrets
+                  key: jwt-secret
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: file-service
+  namespace: uav-store
+  labels:
+    app: file-service
+spec:
+  selector:
+    app: file-service
+  ports:
+    - port: 8082
+      targetPort: 8082
+  type: ClusterIP

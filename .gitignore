@@ -27,6 +27,8 @@ go.work.sum
 # env file
 .env
 
+deployment/k8s/01-secrets.yaml
+
 # Editor/IDE
 # .idea/
 # .vscode/

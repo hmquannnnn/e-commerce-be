@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: product-migrations
+  namespace: uav-store
+data:
+  001_extensions.sql: |
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+  002_create_categories_table.sql: |
+    CREATE TABLE IF NOT EXISTS categories (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL UNIQUE,
+      description TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+
+  003_create_products_table.sql: |
+    CREATE TABLE IF NOT EXISTS products (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      name VARCHAR(50) NOT NULL,
+      description TEXT,
+      price DECIMAL(12,2) NOT NULL CHECK (price >= 0),
+      specs JSONB,
+      category_id INT REFERENCES categories(id) ON DELETE SET NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS product_images (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      url TEXT NOT NULL,
+      display_order INT NOT NULL DEFAULT 0,
+      is_primary BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+
+  004_create_inventory_table.sql: |
+    CREATE TABLE IF NOT EXISTS inventory (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        stock_quantity INT NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
+        reserved_quantity INT NOT NULL DEFAULT 0 CHECK (reserved_quantity >= 0),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE(product_id),
+        CHECK (reserved_quantity <= stock_quantity)
+    );
