@@ -37,6 +37,11 @@ spec:
                 configMapKeyRef:
                   name: uav-store-config
                   key: PRODUCT_SERVICE_URL
+            - name: ORDER_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: uav-store-config
+                  key: ORDER_SERVICE_URL
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:

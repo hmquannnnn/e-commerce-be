@@ -48,13 +48,17 @@ pipeline {
                         pkg        : 'pkg/',
                         apiGateway : 'api-gateway/',
                         user       : 'services/user',
-                        file       : 'services/file'
+                        file       : 'services/file',
+                        product    : 'services/product',
+                        order      : 'services/order'
                     ]
 
                     if (changedFiles.contains(service.pkg)) {
                         env.BUILD_USER = 'true'
                         env.BUILD_FILE = 'true'
                         env.BUILD_API_GATEWAY = 'true'
+                        env.BUILD_PRODUCT = 'true'
+                        env.BUILD_ORDER = 'true'
 
                         echo 'all services changed'
                     } else if (changedFiles.contains(service.apiGateway)) {
@@ -66,6 +70,12 @@ pipeline {
                     } else if (changedFiles.contains(service.file)) {
                         env.BUILD_FILE = 'true'
                         echo 'file service changed'
+                    } else if (changedFiles.contains(service.product)) {
+                        env.BUILD_PRODUCT = 'true'
+                        echo 'product service changed'
+                    } else if (changedFiles.contains(service.order)) {
+                        env.BUILD_ORDER = 'true'
+                        echo 'order service changed'
                     }
                 }
             }
@@ -99,6 +109,26 @@ pipeline {
                         dir ('services/file') {
                             sh 'go mod download'
                             sh 'go build -o bin/file-service'
+                        }
+                    }
+                }
+
+                stage('Build Product Service') {
+                    when { expression { return env.BUILD_PRODUCT == 'true' } }
+                    steps {
+                        dir ('services/product') {
+                            sh 'go mod download'
+                            sh 'go build -o bin/product-service'
+                        }
+                    }
+                }
+
+                stage('Build Order Service') {
+                    when { expression { return env.BUILD_ORDER == 'true' } }
+                    steps {
+                        dir ('services/order') {
+                            sh 'go mod download'
+                            sh 'go build -o bin/order-service'
                         }
                     }
                 }
