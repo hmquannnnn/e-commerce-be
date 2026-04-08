@@ -23,6 +23,9 @@ data:
 
   # MinIO (file-service dùng qua pkg/storage/minio NewConfigFromEnv)
   MINIO_ENDPOINT: minio.uav-store.svc.cluster.local:9000
+  # MINIO_PUBLIC_ENDPOINT: host:port mà browser có thể reach trực tiếp
+  # Dùng port-forward: kubectl port-forward svc/minio 9000:9000 -n uav-store
+  MINIO_PUBLIC_ENDPOINT: localhost:9000
   MINIO_USE_SSL: "false"
   MINIO_REGION: us-east-1
   STORAGE_BUCKET_NAME: uav-store

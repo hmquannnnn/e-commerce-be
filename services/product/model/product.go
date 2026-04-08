@@ -8,14 +8,15 @@ import (
 )
 
 type Product struct {
-	ID          uuid.UUID       `json:"id"`
-	Name        string          `json:"name"`
-	Description *string         `json:"description,omitempty"`
-	Price       float64         `json:"price"`
-	Specs       json.RawMessage `json:"specs,omitempty"`
-	CategoryID  *int            `json:"category_id,omitempty"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
+	ID              uuid.UUID       `json:"id"`
+	Name            string          `json:"name"`
+	Description     *string         `json:"description,omitempty"`
+	Price           float64         `json:"price"`
+	Specs           json.RawMessage `json:"specs,omitempty"`
+	CategoryID      *int            `json:"category_id,omitempty"`
+	PrimaryImageURL *string         `json:"primary_image_url,omitempty"`
+	CreatedAt       time.Time       `json:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at"`
 }
 
 type ProductImage struct {
@@ -33,6 +34,7 @@ type ProductWithImages struct {
 }
 
 type CreateProductParams struct {
+	ID          uuid.UUID
 	Name        string
 	Description *string
 	Price       float64

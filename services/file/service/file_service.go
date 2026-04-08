@@ -10,7 +10,7 @@ import (
 )
 
 type FileService interface {
-	GetPresignedUploadURL(ctx context.Context, fileType, contentType string) (PresignedUploadResponse, error)
+	GetPresignedUploadURL(ctx context.Context, fileType, contentType string, productID *string) (PresignedUploadResponse, error)
 }
 
 type fileService struct {
@@ -37,6 +37,7 @@ func NewFileService(
 func (s *fileService) GetPresignedUploadURL(
 	ctx context.Context,
 	fileType, contentType string,
+	productID *string,
 ) (PresignedUploadResponse, error) {
 	fileID := uuid.New().String()
 
@@ -52,8 +53,11 @@ func (s *fileService) GetPresignedUploadURL(
 		prefix = "uploads"
 	}
 
-	// Generate file key: prefix/uuid.ext
-	// Extract extension from content type if possible
+	// If product_id is provided, nest under products/<product_id>/
+	if productID != nil && *productID != "" && fileType == "product" {
+		prefix = fmt.Sprintf("products/%s", *productID)
+	}
+
 	ext := getExtensionFromContentType(contentType)
 	fileName := fmt.Sprintf("%s/%s%s", prefix, fileID, ext)
 

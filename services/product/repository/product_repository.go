@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hmquannnnn/e-commerce/pkg/common/utils"
+	"github.com/hmquannnnn/e-commerce/pkg/storage"
 	"github.com/hmquannnnn/e-commerce/product-service/model"
 )
 
@@ -26,23 +27,24 @@ type ProductRepository interface {
 }
 
 type productRepository struct {
-	db *sql.DB
+	db         *sql.DB
+	storageMgr *storage.Manager
 }
 
-func NewProductRepository(db *sql.DB) ProductRepository {
-	return &productRepository{db: db}
+func NewProductRepository(db *sql.DB, storageMgr *storage.Manager) ProductRepository {
+	return &productRepository{db: db, storageMgr: storageMgr}
 }
 
 func (r *productRepository) Create(ctx context.Context, params *model.CreateProductParams) (*model.Product, error) {
 	query := `
 		INSERT INTO products (id, name, description, price, specs, category_id)
-		VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, name, description, price, specs, category_id, created_at, updated_at
 	`
 	p := &model.Product{}
 	var specsBytes []byte
 	err := r.db.QueryRowContext(ctx, query,
-		params.Name, params.Description, params.Price, params.Specs, params.CategoryID,
+		params.ID, params.Name, params.Description, params.Price, params.Specs, params.CategoryID,
 	).Scan(
 		&p.ID, &p.Name, &p.Description, &p.Price, &specsBytes, &p.CategoryID,
 		&p.CreatedAt, &p.UpdatedAt,
@@ -146,9 +148,10 @@ func (r *productRepository) List(ctx context.Context, filter model.ListProductsF
 	offset := (filter.Page - 1) * filter.Limit
 	dataArgs := append(args, filter.Limit, offset)
 	dataQuery := fmt.Sprintf(`
-		SELECT id, name, description, price, specs, category_id, created_at, updated_at
-		FROM products %s
-		ORDER BY created_at DESC
+		SELECT p.id, p.name, p.description, p.price, p.specs, p.category_id, p.created_at, p.updated_at,
+		       (SELECT url FROM product_images WHERE product_id = p.id AND is_primary = TRUE LIMIT 1) AS primary_image_url
+		FROM products p %s
+		ORDER BY p.created_at DESC
 		LIMIT $%d OFFSET $%d
 	`, where, argIdx, argIdx+1)
 
@@ -162,11 +165,16 @@ func (r *productRepository) List(ctx context.Context, filter model.ListProductsF
 	for rows.Next() {
 		p := &model.Product{}
 		var specsBytes []byte
-		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Price, &specsBytes, &p.CategoryID, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		var rawImageURL *string
+		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Price, &specsBytes, &p.CategoryID, &p.CreatedAt, &p.UpdatedAt, &rawImageURL); err != nil {
 			return nil, 0, fmt.Errorf("failed to scan product: %w", err)
 		}
 		if specsBytes != nil {
 			p.Specs = json.RawMessage(specsBytes)
+		}
+		if rawImageURL != nil && r.storageMgr != nil {
+			// url := r.storageMgr.GetPublicURL(*rawImageURL)
+			p.PrimaryImageURL = rawImageURL
 		}
 		products = append(products, p)
 	}

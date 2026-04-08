@@ -112,6 +112,31 @@ spec:
                 configMapKeyRef:
                   name: uav-store-config
                   key: DB_SSL_MODE
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: uav-store-config
+                  key: MINIO_ENDPOINT
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: uav-store-secrets
+                  key: minio-root-user
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: uav-store-secrets
+                  key: minio-root-password
+            - name: MINIO_USE_SSL
+              valueFrom:
+                configMapKeyRef:
+                  name: uav-store-config
+                  key: MINIO_USE_SSL
+            - name: STORAGE_BUCKET_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: uav-store-config
+                  key: STORAGE_BUCKET_NAME
           livenessProbe:
             httpGet:
               path: /health

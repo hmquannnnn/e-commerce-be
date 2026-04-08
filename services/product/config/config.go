@@ -9,6 +9,15 @@ import (
 type Config struct {
 	App      AppConfig
 	Database DatabaseConfig
+	MinIO    MinIOConfig
+}
+
+type MinIOConfig struct {
+	Endpoint        string
+	AccessKey       string
+	SecretAccessKey string
+	UseSSL          bool
+	BucketName      string
 }
 
 type AppConfig struct {
@@ -44,6 +53,13 @@ func Load() (*Config, error) {
 			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
 			MaxConns: getEnvAsInt("DB_MAX_CONNS", 25),
 			MaxIdle:  getEnvAsInt("DB_MAX_IDLE", 10),
+		},
+		MinIO: MinIOConfig{
+			Endpoint:        getEnv("MINIO_ENDPOINT", "localhost:9000"),
+			AccessKey:       getEnv("MINIO_ACCESS_KEY", "minio"),
+			SecretAccessKey: getEnv("MINIO_SECRET_KEY", "minio123"),
+			UseSSL:          getEnvAsBool("MINIO_USE_SSL", false),
+			BucketName:      getEnv("STORAGE_BUCKET_NAME", "uav-store"),
 		},
 	}
 
@@ -91,6 +107,13 @@ func getEnvAsInt(key string, defaultValue int) int {
 		if intValue, err := strconv.Atoi(value); err == nil {
 			return intValue
 		}
+	}
+	return defaultValue
+}
+
+func getEnvAsBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		return value == "true"
 	}
 	return defaultValue
 }

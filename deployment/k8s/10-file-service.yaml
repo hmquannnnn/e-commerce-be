@@ -70,6 +70,11 @@ spec:
                 configMapKeyRef:
                   name: uav-store-config
                   key: MINIO_REGION
+            - name: MINIO_PUBLIC_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: uav-store-config
+                  key: MINIO_PUBLIC_ENDPOINT
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:

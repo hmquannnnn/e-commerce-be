@@ -30,7 +30,6 @@ func (r *Router) SetupRoutes() *gin.Engine {
 	router := gin.Default()
 
 	router.Use(RequestIDMiddleware())
-	router.Use(CORSMiddleware())
 
 	router.GET("/health", r.healthCheck)
 	router.GET("/api/health", r.healthCheck)
@@ -57,7 +56,8 @@ func (r *Router) SetupRoutes() *gin.Engine {
 		// Products
 		products := v1.Group("/products")
 		{
-			// Public
+			// Public — new-id must be before /:id to avoid param conflict
+			products.GET("/new-id", r.productHandler.GenerateID)
 			products.GET("", r.productHandler.List)
 			products.GET("/:id", r.productHandler.GetByID)
 
@@ -81,9 +81,9 @@ func (r *Router) SetupRoutes() *gin.Engine {
 			inventory.PATCH("/:product_id/stock", r.inventoryHandler.UpdateStock)
 		}
 
-		// Internal stock management (service-to-service)
+		// Internal stock management (order-service → product-service). No X-User-ID: not a user request.
+		// Expose only on trusted network (e.g. cluster internal / localhost dev).
 		internal := v1.Group("/internal/inventory")
-		internal.Use(RequireAuth())
 		{
 			internal.POST("/reserve", r.inventoryHandler.ReserveStock)
 			internal.POST("/release", r.inventoryHandler.ReleaseStock)
