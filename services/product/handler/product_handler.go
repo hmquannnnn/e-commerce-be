@@ -19,6 +19,14 @@ func NewProductHandler(productService service.ProductService) *ProductHandler {
 	return &ProductHandler{productService: productService}
 }
 
+// GenerateID returns a new random UUID for use as a product ID before form submission.
+func (h *ProductHandler) GenerateID(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    gin.H{"product_id": uuid.New().String()},
+	})
+}
+
 func (h *ProductHandler) Create(c *gin.Context) {
 	var req CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -26,12 +34,23 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		return
 	}
 
+	images := make([]service.ImageInput, 0, len(req.Images))
+	for _, img := range req.Images {
+		images = append(images, service.ImageInput{
+			URL:          img.URL,
+			DisplayOrder: img.DisplayOrder,
+			IsPrimary:    img.IsPrimary,
+		})
+	}
+
 	product, err := h.productService.CreateProduct(c.Request.Context(), service.CreateProductParams{
+		ProductID:   req.ProductID,
 		Name:        req.Name,
 		Description: req.Description,
 		Price:       req.Price,
 		Specs:       req.Specs,
 		CategoryID:  req.CategoryID,
+		Images:      images,
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidInput) {
@@ -42,20 +61,26 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Return product without images since it's brand new
-	resp := &ProductResponse{
-		ID:          product.ID,
-		Name:        product.Name,
-		Description: product.Description,
-		Price:       product.Price,
-		Specs:       product.Specs,
-		CategoryID:  product.CategoryID,
-		Images:      []ProductImageResponse{},
-		CreatedAt:   product.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:   product.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	// Fetch the product with images to include in response
+	productWithImages, err := h.productService.GetProduct(c.Request.Context(), product.ID)
+	if err != nil {
+		// Fallback: return basic product without images
+		resp := &ProductResponse{
+			ID:          product.ID,
+			Name:        product.Name,
+			Description: product.Description,
+			Price:       product.Price,
+			Specs:       product.Specs,
+			CategoryID:  product.CategoryID,
+			Images:      []ProductImageResponse{},
+			CreatedAt:   product.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			UpdatedAt:   product.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+		respondCreated(c, "Product created successfully", resp)
+		return
 	}
 
-	respondCreated(c, "Product created successfully", resp)
+	respondCreated(c, "Product created successfully", ToProductResponse(productWithImages))
 }
 
 func (h *ProductHandler) GetByID(c *gin.Context) {

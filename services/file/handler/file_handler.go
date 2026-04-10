@@ -18,8 +18,9 @@ func NewFileHandler(fileService service.FileService) *FileHandler {
 }
 
 type GetPresignedURLRequest struct {
-	FileType    string `json:"file_type" binding:"required,oneof=avatar image product document"` // avatar, image, product, document
-	ContentType string `json:"content_type" binding:"required"`                                  // e.g., image/jpeg, image/png
+	FileType    string  `json:"file_type" binding:"required,oneof=avatar image product document"`
+	ContentType string  `json:"content_type" binding:"required"`
+	ProductID   *string `json:"product_id,omitempty"`
 }
 
 func (h *FileHandler) GetPresignedUploadURL(c *gin.Context) {
@@ -33,7 +34,7 @@ func (h *FileHandler) GetPresignedUploadURL(c *gin.Context) {
 		return
 	}
 
-	response, err := h.fileService.GetPresignedUploadURL(c.Request.Context(), req.FileType, req.ContentType)
+	response, err := h.fileService.GetPresignedUploadURL(c.Request.Context(), req.FileType, req.ContentType, req.ProductID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,

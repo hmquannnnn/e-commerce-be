@@ -25,6 +25,9 @@ Manifest deploy toàn bộ stack vào namespace **`uav-store`**. Thứ tự file
 | `09-product-migrations.yaml` | ConfigMap migration product                                    |
 | `10-file-service.yaml`       | File service (MinIO + JWT)                                     |
 | `11-product-service.yaml`    | Product service                                                |
+| `12-postgres-order.yaml`       | PVC + Postgres order DB + Service                              |
+| `13-order-migrations.yaml`     | ConfigMap migration order                                      |
+| `14-order-service.yaml`        | Order service                                                  |
 
 Tài liệu học chi tiết hơn: [`plan.md`](./plan.md) (có thể lệch tên namespace / file so với repo — ưu tiên bảng trên).
 
@@ -42,10 +45,13 @@ Tài liệu học chi tiết hơn: [`plan.md`](./plan.md) (có thể lệch tên
    stringData:
      user-db-password: "postgres"
      product-db-password: "postgres"
+     order-db-password: "postgres"
      minio-root-user: "minio"
      minio-root-password: "minio123"
      jwt-secret: "<chuỗi-dài-giống-nhau-trên-mọi-service>"
    ```
+
+   Key `order-db-password` bắt buộc nếu deploy `12-postgres-order.yaml` / `14-order-service.yaml`.
 
    Hoặc giữ `data:` và mỗi giá trị là **base64** (một lần encode):
 
@@ -53,7 +59,7 @@ Tài liệu học chi tiết hơn: [`plan.md`](./plan.md) (có thể lệch tên
    echo -n 'postgres' | base64
    ```
 
-3. Các key phải khớp manifest: `user-db-password`, `product-db-password`, `minio-root-user`, `minio-root-password`, `jwt-secret`.
+3. Các key phải khớp manifest: `user-db-password`, `product-db-password`, `order-db-password`, `minio-root-user`, `minio-root-password`, `jwt-secret`.
 
 ## Build image vào Minikube (local)
 

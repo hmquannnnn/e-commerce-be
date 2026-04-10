@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/hmquannnnn/e-commerce/pkg/storage"
+	"github.com/hmquannnnn/e-commerce/pkg/storage/minio"
 	"github.com/hmquannnnn/e-commerce/product-service/config"
 	"github.com/hmquannnnn/e-commerce/product-service/internal/db"
 	"github.com/hmquannnnn/e-commerce/product-service/repository"
@@ -32,14 +34,32 @@ func runServer() {
 	defer database.Close()
 	log.Println("✓ Database connected successfully")
 
+	minioClient, err := minio.NewClient(minio.Config{
+		Endpoint:        cfg.MinIO.Endpoint,
+		AccessKey:       cfg.MinIO.AccessKey,
+		SecretAccessKey: cfg.MinIO.SecretAccessKey,
+		UseSSL:          cfg.MinIO.UseSSL,
+	})
+	if err != nil {
+		log.Printf("Warning: failed to connect to MinIO: %v — folder auto-creation disabled", err)
+		minioClient = nil
+	} else {
+		log.Println("✓ MinIO connected successfully")
+	}
+
+	var storageMgr *storage.Manager
+	if minioClient != nil {
+		storageMgr = storage.NewManager(minioClient)
+	}
+
 	categoryRepo := repository.NewCategoryRepository(database)
-	productRepo := repository.NewProductRepository(database)
+	productRepo := repository.NewProductRepository(database, storageMgr)
 	inventoryRepo := repository.NewInventoryRepository(database)
 	log.Println("✓ Repositories initialized")
 
 	categoryService := service.NewCategoryService(categoryRepo)
 	inventoryService := service.NewInventoryService(inventoryRepo)
-	productService := service.NewProductService(productRepo, inventoryRepo)
+	productService := service.NewProductService(productRepo, inventoryRepo, minioClient, cfg.MinIO.BucketName)
 	log.Println("✓ Services initialized")
 
 	router := routes.NewRouter(categoryService, productService, inventoryService)

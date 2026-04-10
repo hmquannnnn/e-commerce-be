@@ -197,24 +197,6 @@ func (m *AuthMiddleware) OptionalAuth() gin.HandlerFunc {
 // Other Common Middlewares
 // ============================================================================
 
-// CORSMiddleware handles CORS for Gin
-func CORSMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*") // In production, set specific origins
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
-		c.Writer.Header().Set("Access-Control-Max-Age", "3600")
-
-		// Handle preflight requests
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(http.StatusNoContent)
-			return
-		}
-
-		c.Next()
-	}
-}
-
 // LoggingMiddleware logs HTTP requests for Gin
 func LoggingMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {

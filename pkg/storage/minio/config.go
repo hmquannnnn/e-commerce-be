@@ -6,6 +6,7 @@ import (
 
 type Config struct {
 	Endpoint        string
+	PublicEndpoint  string // externally reachable endpoint for presigned URLs (e.g. localhost:9000)
 	AccessKey       string
 	SecretAccessKey string
 	UseSSL          bool
@@ -13,8 +14,10 @@ type Config struct {
 }
 
 func NewConfigFromEnv() Config {
+	endpoint := getEnv("MINIO_ENDPOINT", "localhost:9000")
 	return Config{
-		Endpoint:        getEnv("MINIO_ENDPOINT", "localhost:9000"),
+		Endpoint:        endpoint,
+		PublicEndpoint:  getEnv("MINIO_PUBLIC_ENDPOINT", "localhost:9000"),
 		AccessKey:       getEnv("MINIO_ACCESS_KEY", "minio"),
 		SecretAccessKey: getEnv("MINIO_SECRET_KEY", "minio123"),
 		UseSSL:          getEnvAsBool("MINIO_USE_SSL", false),

@@ -41,11 +41,13 @@ func ToCategoryResponse(c *model.Category) *CategoryResponse {
 // ─── Product DTOs ─────────────────────────────────────────────────────────────
 
 type CreateProductRequest struct {
-	Name        string          `json:"name" binding:"required,min=1,max=50"`
-	Description *string         `json:"description,omitempty"`
-	Price       float64         `json:"price" binding:"required,min=0"`
-	Specs       json.RawMessage `json:"specs,omitempty"`
-	CategoryID  *int            `json:"category_id,omitempty"`
+	ProductID   *uuid.UUID       `json:"product_id,omitempty"`
+	Name        string           `json:"name" binding:"required,min=1,max=50"`
+	Description *string          `json:"description,omitempty"`
+	Price       float64          `json:"price" binding:"required,min=0"`
+	Specs       json.RawMessage  `json:"specs,omitempty"`
+	CategoryID  *int             `json:"category_id,omitempty"`
+	Images      []AddImageRequest `json:"images,omitempty"`
 }
 
 type UpdateProductRequest struct {
@@ -91,14 +93,15 @@ type ProductResponse struct {
 }
 
 type ProductListItemResponse struct {
-	ID          uuid.UUID       `json:"id"`
-	Name        string          `json:"name"`
-	Description *string         `json:"description,omitempty"`
-	Price       float64         `json:"price"`
-	Specs       json.RawMessage `json:"specs,omitempty"`
-	CategoryID  *int            `json:"category_id,omitempty"`
-	CreatedAt   string          `json:"created_at"`
-	UpdatedAt   string          `json:"updated_at"`
+	ID              uuid.UUID       `json:"id"`
+	Name            string          `json:"name"`
+	Description     *string         `json:"description,omitempty"`
+	Price           float64         `json:"price"`
+	Specs           json.RawMessage `json:"specs,omitempty"`
+	CategoryID      *int            `json:"category_id,omitempty"`
+	PrimaryImageURL *string         `json:"primary_image_url,omitempty"`
+	CreatedAt       string          `json:"created_at"`
+	UpdatedAt       string          `json:"updated_at"`
 }
 
 func ToProductResponse(p *model.ProductWithImages) *ProductResponse {
@@ -128,14 +131,15 @@ func ToProductResponse(p *model.ProductWithImages) *ProductResponse {
 
 func ToProductListItemResponse(p *model.Product) *ProductListItemResponse {
 	return &ProductListItemResponse{
-		ID:          p.ID,
-		Name:        p.Name,
-		Description: p.Description,
-		Price:       p.Price,
-		Specs:       p.Specs,
-		CategoryID:  p.CategoryID,
-		CreatedAt:   p.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:   p.UpdatedAt.Format(time.RFC3339),
+		ID:              p.ID,
+		Name:            p.Name,
+		Description:     p.Description,
+		Price:           p.Price,
+		Specs:           p.Specs,
+		CategoryID:      p.CategoryID,
+		PrimaryImageURL: p.PrimaryImageURL,
+		CreatedAt:       p.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:       p.UpdatedAt.Format(time.RFC3339),
 	}
 }
 
