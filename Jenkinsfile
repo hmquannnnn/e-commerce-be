@@ -32,6 +32,9 @@ pipeline {
                         env.BUILD_USER = 'true'
                         env.BUILD_FILE = 'true'
                         env.BUILD_API_GATEWAY = 'true'
+                        env.BUILD_PRODUCT = 'true'
+                        env.BUILD_ORDER = 'true'
+                        env.BUILD_PAYMENT = 'true'
 
                         echo 'all services changed'
                         return
@@ -50,7 +53,8 @@ pipeline {
                         user       : 'services/user',
                         file       : 'services/file',
                         product    : 'services/product',
-                        order      : 'services/order'
+                        order      : 'services/order',
+                        payment    : 'services/payment'
                     ]
 
                     if (changedFiles.contains(service.pkg)) {
@@ -59,6 +63,7 @@ pipeline {
                         env.BUILD_API_GATEWAY = 'true'
                         env.BUILD_PRODUCT = 'true'
                         env.BUILD_ORDER = 'true'
+                        env.BUILD_PAYMENT = 'true'
 
                         echo 'all services changed'
                     } else if (changedFiles.contains(service.apiGateway)) {
@@ -76,6 +81,9 @@ pipeline {
                     } else if (changedFiles.contains(service.order)) {
                         env.BUILD_ORDER = 'true'
                         echo 'order service changed'
+                    } else if (changedFiles.contains(service.payment)) {
+                        env.BUILD_PAYMENT = 'true'
+                        echo 'payment service changed'
                     }
                 }
             }
@@ -129,6 +137,16 @@ pipeline {
                         dir ('services/order') {
                             sh 'go mod download'
                             sh 'go build -o bin/order-service'
+                        }
+                    }
+                }
+
+                stage('Build Payment Service') {
+                    when { expression { return env.BUILD_PAYMENT == 'true' } }
+                    steps {
+                        dir ('services/payment') {
+                            sh 'go mod download'
+                            sh 'go build -o bin/payment-service'
                         }
                     }
                 }

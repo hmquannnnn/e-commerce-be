@@ -45,3 +45,18 @@ data:
         quantity     INT NOT NULL CHECK (quantity > 0)
     );
     CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
+
+  000004_extend_order_states_and_methods.sql: |
+    UPDATE orders SET status = 'DELIVERING' WHERE status = 'PROCESSING';
+    ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+    ALTER TABLE orders ADD CONSTRAINT orders_status_check
+        CHECK (status IN ('PENDING', 'PAID', 'DELIVERING', 'DELIVERED', 'CANCELLED'));
+    ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_payment_method_check;
+    ALTER TABLE orders ADD CONSTRAINT orders_payment_method_check
+        CHECK (payment_method IN ('VNPAY', 'CASH', 'CARD'));
+
+  000005_payos_payment_methods.sql: |
+    UPDATE orders SET payment_method = 'QR_CODE' WHERE payment_method IN ('VNPAY', 'CARD');
+    ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_payment_method_check;
+    ALTER TABLE orders ADD CONSTRAINT orders_payment_method_check
+        CHECK (payment_method IN ('QR_CODE', 'CASH'));

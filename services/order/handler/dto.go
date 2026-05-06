@@ -66,12 +66,16 @@ type CreateOrderItemRequest struct {
 }
 
 type CreateOrderRequest struct {
-	PaymentMethod string                   `json:"payment_method" binding:"required,oneof=VNPAY CASH"`
+	PaymentMethod string                   `json:"payment_method" binding:"required,oneof=QR_CODE CASH"`
 	Items         []CreateOrderItemRequest `json:"items" binding:"required,min=1,dive"`
 }
 
+// UpdateOrderStatusRequest is used by the admin endpoint. It only accepts the
+// transitions the admin UI is allowed to drive. PAID is intentionally excluded
+// from the admin path — that transition is owned by payment-service via the
+// internal /mark-paid endpoint.
 type UpdateOrderStatusRequest struct {
-	Status string `json:"status" binding:"required,oneof=PENDING PAID PROCESSING CANCELLED"`
+	Status string `json:"status" binding:"required,oneof=DELIVERING DELIVERED CANCELLED"`
 }
 
 type ListOrdersQuery struct {

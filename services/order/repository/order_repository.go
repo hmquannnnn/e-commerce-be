@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hmquannnnn/e-commerce/order-service/model"
@@ -21,6 +22,7 @@ type OrderRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*model.OrderWithItems, error)
 	List(ctx context.Context, filter model.ListOrdersFilter) ([]*model.Order, int64, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status model.OrderStatus) error
+	ListExpiredPendingOrders(ctx context.Context, cutoff time.Time) ([]uuid.UUID, error)
 }
 
 type orderRepository struct {
@@ -236,4 +238,27 @@ func (r *orderRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status
 		return ErrOrderNotFound
 	}
 	return nil
+}
+
+func (r *orderRepository) ListExpiredPendingOrders(ctx context.Context, cutoff time.Time) ([]uuid.UUID, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id FROM orders
+		WHERE status = 'PENDING'
+		  AND payment_method != 'CASH'
+		  AND created_at < $1
+	`, cutoff)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list expired orders: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan expired order id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
