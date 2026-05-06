@@ -9,7 +9,7 @@ import (
 )
 
 // SetupRouter configures all routes for the API Gateway
-func SetupRouter(userServiceURL string, fileServiceURL string, productServiceURL string, orderServiceURL string, jwtSecret string) *gin.Engine {
+func SetupRouter(userServiceURL string, fileServiceURL string, productServiceURL string, orderServiceURL string, paymentServiceURL string, jwtSecret string) *gin.Engine {
 	r := gin.Default()
 
 	// Global middlewares
@@ -23,6 +23,7 @@ func SetupRouter(userServiceURL string, fileServiceURL string, productServiceURL
 	fileServiceReverseProxy := proxy.NewReverseProxy(fileServiceURL)
 	productServiceReverseProxy := proxy.NewReverseProxy(productServiceURL)
 	orderServiceReverseProxy := proxy.NewReverseProxy(orderServiceURL)
+	paymentServiceReverseProxy := proxy.NewReverseProxy(paymentServiceURL)
 
 	// API v1 group
 	v1 := r.Group("/api")
@@ -42,6 +43,10 @@ func SetupRouter(userServiceURL string, fileServiceURL string, productServiceURL
 		v1.GET("/products/:id", productServiceReverseProxy)
 		v1.GET("/categories", productServiceReverseProxy)
 		v1.GET("/categories/:id", productServiceReverseProxy)
+
+		// Public payment webhook (PayOS)
+		v1.POST("/payments/webhook/payos", paymentServiceReverseProxy)
+		v1.GET("/payments/webhook/payos", paymentServiceReverseProxy)
 
 		// Protected routes - Authentication required
 		protected := v1.Group("")
@@ -117,6 +122,15 @@ func SetupRouter(userServiceURL string, fileServiceURL string, productServiceURL
 			{
 				adminOrders.Any("", orderServiceReverseProxy)
 				adminOrders.Any("/*path", orderServiceReverseProxy)
+			}
+
+			// Payment routes (explicit — wildcard conflicts with public /callback and /webhook paths)
+			payments := protected.Group("/payments")
+			{
+				payments.POST("", paymentServiceReverseProxy)
+				payments.GET("/:id", paymentServiceReverseProxy)
+				payments.GET("/order/:orderId", paymentServiceReverseProxy)
+				payments.POST("/:id/cancel", paymentServiceReverseProxy)
 			}
 		}
 	}

@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-migrations
+  namespace: uav-store
+data:
+  000001_create_payments.sql: |
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE SEQUENCE IF NOT EXISTS payos_order_code_seq START 100001;
+    CREATE TABLE IF NOT EXISTS payments (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        order_id VARCHAR(100) NOT NULL,
+        user_id UUID NOT NULL,
+        provider VARCHAR(20) NOT NULL CHECK (provider IN ('payos')),
+        payment_method VARCHAR(20) NOT NULL CHECK (payment_method IN ('qr_code')),
+        payos_order_code BIGINT UNIQUE,
+        amount BIGINT NOT NULL CHECK (amount > 0),
+        currency VARCHAR(10) NOT NULL DEFAULT 'VND',
+        status VARCHAR(30) NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending', 'requires_action', 'processing', 'succeeded', 'failed', 'canceled', 'expired', 'refunded_partial', 'refunded_full')),
+        provider_payment_id VARCHAR(255),
+        provider_transaction_ref VARCHAR(255),
+        return_url TEXT,
+        cancel_url TEXT,
+        checkout_url TEXT,
+        expires_at TIMESTAMP,
+        metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
+    CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id);
+    CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+    CREATE INDEX IF NOT EXISTS idx_payments_provider_payment_id ON payments(provider_payment_id);
+    CREATE INDEX IF NOT EXISTS idx_payments_provider_transaction_ref ON payments(provider_transaction_ref);
+
+  000002_create_payment_attempts.sql: |
+    CREATE TABLE IF NOT EXISTS payment_attempts (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        payment_id UUID NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+        attempt_no INT NOT NULL CHECK (attempt_no > 0),
+        provider_session_id VARCHAR(255),
+        checkout_url TEXT,
+        status VARCHAR(30) NOT NULL,
+        raw_request JSONB,
+        raw_response JSONB,
+        error_code VARCHAR(100),
+        error_message TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_payment_attempts_payment_id ON payment_attempts(payment_id);
+
+  000003_create_payment_webhook_events.sql: |
+    CREATE TABLE IF NOT EXISTS payment_webhook_events (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        provider VARCHAR(20) NOT NULL CHECK (provider IN ('payos')),
+        event_id VARCHAR(255) NOT NULL,
+        signature_valid BOOLEAN NOT NULL DEFAULT false,
+        payload JSONB NOT NULL,
+        processed_at TIMESTAMP NULL,
+        process_status VARCHAR(20) NOT NULL DEFAULT 'new'
+          CHECK (process_status IN ('new', 'processed', 'ignored', 'failed')),
+        error TEXT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE (provider, event_id)
+    );
+
+  000004_payos_migration.sql: |
+    CREATE SEQUENCE IF NOT EXISTS payos_order_code_seq START 100001;
+    ALTER TABLE payments ADD COLUMN IF NOT EXISTS payos_order_code BIGINT UNIQUE;
+    ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_provider_check;
+    ALTER TABLE payments ADD CONSTRAINT payments_provider_check
+        CHECK (provider IN ('payos'));
+    ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_payment_method_check;
+    ALTER TABLE payments ADD CONSTRAINT payments_payment_method_check
+        CHECK (payment_method IN ('qr_code'));
+    ALTER TABLE payment_webhook_events DROP CONSTRAINT IF EXISTS payment_webhook_events_provider_check;
+    ALTER TABLE payment_webhook_events ADD CONSTRAINT payment_webhook_events_provider_check
+        CHECK (provider IN ('payos'));

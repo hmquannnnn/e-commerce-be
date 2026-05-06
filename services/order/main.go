@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"log/slog"
 	"os"
@@ -47,6 +48,9 @@ func main() {
 
 	cartSvc := service.NewCartService(cartRepo, productClient)
 	orderSvc := service.NewOrderService(orderRepo, cartRepo, productClient)
+
+	expiryWorker := service.NewOrderExpiryWorker(orderRepo, productClient)
+	go expiryWorker.Start(context.Background())
 
 	router := routes.NewRouter(cartSvc, orderSvc)
 	engine := router.SetupRoutes()

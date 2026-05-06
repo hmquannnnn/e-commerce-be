@@ -9,17 +9,37 @@ import (
 type OrderStatus string
 type PaymentMethod string
 
+// Order state machine:
+//
+//	PENDING ──(QR_CODE paid)──► PAID ──(admin)──► DELIVERING ──(admin)──► DELIVERED
+//	  │                              │                   │
+//	  │ (admin/user cancel,          │ (admin/user       │  (terminal — không
+//	  │  hoặc expiry 15' với         │  cancel)          │   thể cancel)
+//	  │  QR_CODE)                    ▼                   ▼
+//	  ▼                          CANCELLED          ─────
+//	CANCELLED
+//
+// CASH bỏ qua bước PAID: PENDING ──(admin xác nhận)──► DELIVERING.
 const (
 	OrderStatusPending    OrderStatus = "PENDING"
 	OrderStatusPaid       OrderStatus = "PAID"
-	OrderStatusProcessing OrderStatus = "PROCESSING"
+	OrderStatusDelivering OrderStatus = "DELIVERING"
+	OrderStatusDelivered  OrderStatus = "DELIVERED"
 	OrderStatusCancelled  OrderStatus = "CANCELLED"
 )
 
 const (
-	PaymentMethodVNPAY PaymentMethod = "VNPAY"
-	PaymentMethodCash  PaymentMethod = "CASH"
+	PaymentMethodQRCode PaymentMethod = "QR_CODE"
+	PaymentMethodCash   PaymentMethod = "CASH"
 )
+
+func IsValidPaymentMethod(m PaymentMethod) bool {
+	switch m {
+	case PaymentMethodQRCode, PaymentMethodCash:
+		return true
+	}
+	return false
+}
 
 type Order struct {
 	ID            uuid.UUID     `json:"id"`

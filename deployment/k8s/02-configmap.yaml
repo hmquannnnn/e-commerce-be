@@ -20,6 +20,7 @@ data:
   FILE_SERVICE_URL: http://file-service.uav-store.svc.cluster.local:8082
   PRODUCT_SERVICE_URL: http://product-service.uav-store.svc.cluster.local:8083
   ORDER_SERVICE_URL: http://order-service.uav-store.svc.cluster.local:8085
+  PAYMENT_SERVICE_URL: http://payment-service.uav-store.svc.cluster.local:8086
 
   # MinIO (file-service dùng qua pkg/storage/minio NewConfigFromEnv)
   MINIO_ENDPOINT: minio.uav-store.svc.cluster.local:9000
@@ -29,3 +30,11 @@ data:
   MINIO_USE_SSL: "false"
   MINIO_REGION: us-east-1
   STORAGE_BUCKET_NAME: uav-store
+
+  # External URL mà browser có thể reach API Gateway.
+  # Dùng port-forward: kubectl port-forward svc/api-gateway 8080:8080 -n uav-store
+  API_GATEWAY_EXTERNAL_URL: http://localhost:8080
+
+  # PayOS — FE return/cancel URLs (fallback; FE thường gửi kèm trong request)
+  PAYOS_RETURN_URL: http://localhost:3000/en/payment/result?state=success
+  PAYOS_CANCEL_URL: http://localhost:3000/en/payment/result?state=cancel

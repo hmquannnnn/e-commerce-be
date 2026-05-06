@@ -38,12 +38,17 @@ func main() {
 		log.Fatal("ORDER_SERVICE_URL is required")
 	}
 
+	paymentServiceURL := os.Getenv("PAYMENT_SERVICE_URL")
+	if paymentServiceURL == "" {
+		log.Fatal("PAYMENT_SERVICE_URL is required")
+	}
+
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		log.Fatal("JWT_SECRET is required")
 	}
 
-	r := routes.SetupRouter(userServiceURL, fileServiceURL, productServiceURL, orderServiceURL, jwtSecret)
+	r := routes.SetupRouter(userServiceURL, fileServiceURL, productServiceURL, orderServiceURL, paymentServiceURL, jwtSecret)
 
 	log.Printf("API Gateway running on port %s", port)
 	if err := r.Run(":" + port); err != nil {
