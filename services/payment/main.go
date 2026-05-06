@@ -16,6 +16,7 @@ import (
 	"github.com/hmquannnnn/e-commerce/payment-service/service"
 )
 
+// test jenkins pipeline
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: No .env file found")
@@ -62,4 +63,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-
