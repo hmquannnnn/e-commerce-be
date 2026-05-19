@@ -95,5 +95,22 @@ spec:
   ports:
     - port: 5432
       targetPort: 5432
-      nodePort: 30436
-  type: NodePort
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-payment-external
+  namespace: uav-store
+  labels:
+    app: postgres-payment
+spec:
+  selector:
+    app: postgres-payment
+  ports:
+    - name: postgres
+      protocol: TCP
+      port: 5436
+      targetPort: 5432
+  type: LoadBalancer

@@ -32,7 +32,8 @@ spec:
     spec:
       containers:
         - name: minio
-          image: minio/minio:latest
+          image: minio/minio:latestnpm run import:dry -- --input product-data/products.uav.json --limit 1
+
           args:
             - server
             - /data
@@ -49,6 +50,10 @@ spec:
                 secretKeyRef:
                   name: uav-store-secrets
                   key: minio-root-password
+            - name: MINIO_SERVER_URL
+              value: "http://storage.uav-store.io.vn"
+            - name: MINIO_BROWSER_REDIRECT_URL
+              value: "http://minio.uav-store.io.vn"
           ports:
             - name: api
               containerPort: 9000
@@ -99,5 +104,4 @@ spec:
     - name: console
       port: 9001
       targetPort: 9001
-      nodePort: 30901
-  type: NodePort
+  type: ClusterIP

@@ -64,5 +64,20 @@ spec:
   ports:
     - port: 5432
       targetPort: 5432
-      nodePort: 30433
-  type: NodePort
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-user-external
+  namespace: uav-store
+spec:
+  selector:
+    app: postgres-user
+  ports:
+    - name: postgres
+      protocol: TCP
+      port: 5433
+      targetPort: 5432
+  type: LoadBalancer

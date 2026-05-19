@@ -27,6 +27,8 @@ go.work.sum
 # env file
 .env
 
+.cache
+
 deployment/k8s/01-secrets.yaml
 
 # Editor/IDE
