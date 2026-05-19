@@ -77,8 +77,8 @@ spec:
             name: user-migrations
       containers:
         - name: user-service
-          image: user-service:local
-          imagePullPolicy: Never
+          image: hmquannnnn/user-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8081
           env:
