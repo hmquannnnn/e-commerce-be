@@ -53,6 +53,8 @@ type UpdateProductParams struct {
 type ListProductsFilter struct {
 	CategoryID *int
 	Search     string
+	MinPrice   *float64
+	MaxPrice   *float64
 	Page       int
 	Limit      int
 }

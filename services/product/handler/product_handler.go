@@ -109,10 +109,16 @@ func (h *ProductHandler) List(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, "INVALID_QUERY", "Invalid query parameters")
 		return
 	}
+	if query.MinPrice != nil && query.MaxPrice != nil && *query.MinPrice > *query.MaxPrice {
+		respondError(c, http.StatusBadRequest, "INVALID_PRICE_RANGE", "min_price must be less than or equal to max_price")
+		return
+	}
 
 	filter := model.ListProductsFilter{
 		CategoryID: query.CategoryID,
 		Search:     query.Search,
+		MinPrice:   query.MinPrice,
+		MaxPrice:   query.MaxPrice,
 		Page:       query.Page,
 		Limit:      query.Limit,
 	}
