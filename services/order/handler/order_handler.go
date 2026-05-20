@@ -176,7 +176,7 @@ func (h *OrderHandler) AdminListOrders(c *gin.Context) {
 		status = &s
 	}
 
-	orders, total, err := h.orderService.AdminListOrders(c.Request.Context(), status, query.Page, query.Limit)
+	orders, total, err := h.orderService.AdminListOrders(c.Request.Context(), status, query.Search, query.Page, query.Limit)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list orders")
 		return
@@ -184,7 +184,7 @@ func (h *OrderHandler) AdminListOrders(c *gin.Context) {
 
 	items := make([]*OrderListItemResponse, 0, len(orders))
 	for _, o := range orders {
-		items = append(items, ToOrderListItemResponse(o))
+		items = append(items, ToAdminOrderListItemResponse(o))
 	}
 
 	respondOK(c, "Orders retrieved successfully", gin.H{
@@ -194,6 +194,26 @@ func (h *OrderHandler) AdminListOrders(c *gin.Context) {
 		"limit":       query.Limit,
 		"total_pages": service.TotalPages(total, query.Limit),
 	})
+}
+
+func (h *OrderHandler) AdminGetOrder(c *gin.Context) {
+	orderID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_ID", "Invalid order ID")
+		return
+	}
+
+	order, err := h.orderService.AdminGetOrder(c.Request.Context(), orderID)
+	if err != nil {
+		if errors.Is(err, service.ErrOrderNotFound) {
+			respondError(c, http.StatusNotFound, "ORDER_NOT_FOUND", "Order not found")
+			return
+		}
+		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get order")
+		return
+	}
+
+	respondOK(c, "Order retrieved successfully", ToAdminOrderResponse(order))
 }
 
 func (h *OrderHandler) AdminUpdateStatus(c *gin.Context) {
@@ -251,6 +271,29 @@ func (h *OrderHandler) InternalMarkPaid(c *gin.Context) {
 	}
 
 	respondOK(c, "Order marked paid", nil)
+}
+
+func (h *OrderHandler) InternalTouchPaymentDeadline(c *gin.Context) {
+	orderID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_ID", "Invalid order ID")
+		return
+	}
+
+	if err := h.orderService.TouchPaymentDeadline(c.Request.Context(), orderID); err != nil {
+		if errors.Is(err, service.ErrOrderNotFound) {
+			respondError(c, http.StatusNotFound, "ORDER_NOT_FOUND", "Order not found")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidStatusTransition) {
+			respondError(c, http.StatusConflict, "INVALID_STATUS_TRANSITION", "Order is no longer payable")
+			return
+		}
+		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to extend payment deadline")
+		return
+	}
+
+	respondOK(c, "Payment deadline extended", nil)
 }
 
 // InternalGetOrder trả về thông tin order cho các service nội bộ (không cần auth user).

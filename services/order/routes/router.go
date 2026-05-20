@@ -54,6 +54,7 @@ func (r *Router) SetupRoutes() *gin.Engine {
 		adminOrders.Use(RequireAdmin())
 		{
 			adminOrders.GET("", r.orderHandler.AdminListOrders)
+			adminOrders.GET("/:id", r.orderHandler.AdminGetOrder)
 			adminOrders.PATCH("/:id/status", r.orderHandler.AdminUpdateStatus)
 		}
 	}
@@ -66,6 +67,7 @@ func (r *Router) SetupRoutes() *gin.Engine {
 		// ever needs to flip PENDING → PAID, and the narrow endpoint makes the
 		// state-machine guard explicit.
 		internal.POST("/orders/:id/mark-paid", r.orderHandler.InternalMarkPaid)
+		internal.POST("/orders/:id/touch-payment-deadline", r.orderHandler.InternalTouchPaymentDeadline)
 	}
 
 	return router

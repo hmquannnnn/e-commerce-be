@@ -32,6 +32,7 @@ type OrderClient interface {
 	// MarkOrderPaid yêu cầu order-service chuyển order PENDING → PAID.
 	// Returns ErrOrderNotPayable nếu order không còn ở PENDING (đã cancel, etc).
 	MarkOrderPaid(ctx context.Context, orderID uuid.UUID) error
+	TouchPaymentDeadline(ctx context.Context, orderID uuid.UUID) error
 }
 
 type orderClient struct {
@@ -96,7 +97,15 @@ func (c *orderClient) GetOrder(ctx context.Context, orderID uuid.UUID) (*OrderIn
 
 func (c *orderClient) MarkOrderPaid(ctx context.Context, orderID uuid.UUID) error {
 	url := fmt.Sprintf("%s/internal/orders/%s/mark-paid", c.baseURL, orderID)
+	return c.postOrderAction(ctx, url)
+}
 
+func (c *orderClient) TouchPaymentDeadline(ctx context.Context, orderID uuid.UUID) error {
+	url := fmt.Sprintf("%s/internal/orders/%s/touch-payment-deadline", c.baseURL, orderID)
+	return c.postOrderAction(ctx, url)
+}
+
+func (c *orderClient) postOrderAction(ctx context.Context, url string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)

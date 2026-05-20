@@ -60,6 +60,12 @@ func (router *Router) SetupRoutes() *gin.Engine {
 		}
 	}
 
+	internal := r.Group("/internal")
+	{
+		internal.GET("/users", router.userHandler.InternalListUsers)
+		internal.GET("/users/search", router.userHandler.InternalSearchUsers)
+	}
+
 	return r
 }
 
