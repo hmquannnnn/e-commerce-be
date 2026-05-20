@@ -41,12 +41,12 @@ func ToCategoryResponse(c *model.Category) *CategoryResponse {
 // ─── Product DTOs ─────────────────────────────────────────────────────────────
 
 type CreateProductRequest struct {
-	ProductID   *uuid.UUID       `json:"product_id,omitempty"`
-	Name        string           `json:"name" binding:"required,min=1,max=50"`
-	Description *string          `json:"description,omitempty"`
-	Price       float64          `json:"price" binding:"required,min=0"`
-	Specs       json.RawMessage  `json:"specs,omitempty"`
-	CategoryID  *int             `json:"category_id,omitempty"`
+	ProductID   *uuid.UUID        `json:"product_id,omitempty"`
+	Name        string            `json:"name" binding:"required,min=1,max=50"`
+	Description *string           `json:"description,omitempty"`
+	Price       float64           `json:"price" binding:"required,min=0"`
+	Specs       json.RawMessage   `json:"specs,omitempty"`
+	CategoryID  *int              `json:"category_id,omitempty"`
 	Images      []AddImageRequest `json:"images,omitempty"`
 }
 
@@ -59,10 +59,12 @@ type UpdateProductRequest struct {
 }
 
 type ListProductsQuery struct {
-	CategoryID *int   `form:"category_id"`
-	Search     string `form:"search"`
-	Page       int    `form:"page,default=1"`
-	Limit      int    `form:"limit,default=20"`
+	CategoryID *int     `form:"category_id"`
+	Search     string   `form:"search"`
+	MinPrice   *float64 `form:"min_price" binding:"omitempty,min=0"`
+	MaxPrice   *float64 `form:"max_price" binding:"omitempty,min=0"`
+	Page       int      `form:"page,default=1"`
+	Limit      int      `form:"limit,default=20"`
 }
 
 type AddImageRequest struct {
@@ -81,15 +83,15 @@ type ProductImageResponse struct {
 }
 
 type ProductResponse struct {
-	ID          uuid.UUID             `json:"id"`
-	Name        string                `json:"name"`
-	Description *string               `json:"description,omitempty"`
-	Price       float64               `json:"price"`
-	Specs       json.RawMessage       `json:"specs,omitempty"`
-	CategoryID  *int                  `json:"category_id,omitempty"`
+	ID          uuid.UUID              `json:"id"`
+	Name        string                 `json:"name"`
+	Description *string                `json:"description,omitempty"`
+	Price       float64                `json:"price"`
+	Specs       json.RawMessage        `json:"specs,omitempty"`
+	CategoryID  *int                   `json:"category_id,omitempty"`
 	Images      []ProductImageResponse `json:"images"`
-	CreatedAt   string                `json:"created_at"`
-	UpdatedAt   string                `json:"updated_at"`
+	CreatedAt   string                 `json:"created_at"`
+	UpdatedAt   string                 `json:"updated_at"`
 }
 
 type ProductListItemResponse struct {

@@ -133,6 +133,16 @@ func (r *productRepository) List(ctx context.Context, filter model.ListProductsF
 		args = append(args, "%"+filter.Search+"%")
 		argIdx++
 	}
+	if filter.MinPrice != nil {
+		conditions = append(conditions, fmt.Sprintf("price >= $%d", argIdx))
+		args = append(args, *filter.MinPrice)
+		argIdx++
+	}
+	if filter.MaxPrice != nil {
+		conditions = append(conditions, fmt.Sprintf("price <= $%d", argIdx))
+		args = append(args, *filter.MaxPrice)
+		argIdx++
+	}
 
 	where := ""
 	if len(conditions) > 0 {
