@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         DOCKERHUB_USER = 'hmquannnnn'
-        GITHUB_REPO    = 'hmquannnnn/e-commerce'
+        GITHUB_REPO    = 'hmquannnnn/uav-store-be'
     }
 
     stages {
@@ -196,12 +196,12 @@ pipeline {
                     def user = env.DOCKERHUB_USER
 
                     def services = [
-                        [flag: 'BUILD_API_GATEWAY', name: 'api-gateway',     dockerfile: 'api-gateway/Dockerfile',      context: 'api-gateway'],
-                        [flag: 'BUILD_USER',        name: 'user-service',    dockerfile: 'services/user/Dockerfile',    context: '.'],
-                        [flag: 'BUILD_FILE',        name: 'file-service',    dockerfile: 'services/file/Dockerfile',    context: '.'],
-                        [flag: 'BUILD_PRODUCT',     name: 'product-service', dockerfile: 'services/product/Dockerfile', context: '.'],
-                        [flag: 'BUILD_ORDER',       name: 'order-service',   dockerfile: 'services/order/Dockerfile',   context: '.'],
-                        [flag: 'BUILD_PAYMENT',     name: 'payment-service', dockerfile: 'services/payment/Dockerfile', context: '.'],
+                        [build: env.BUILD_API_GATEWAY == 'true', name: 'api-gateway',     dockerfile: 'api-gateway/Dockerfile',      context: 'api-gateway'],
+                        [build: env.BUILD_USER == 'true',        name: 'user-service',    dockerfile: 'services/user/Dockerfile',    context: '.'],
+                        [build: env.BUILD_FILE == 'true',     name: 'file-service',    dockerfile: 'services/file/Dockerfile',    context: '.'],
+                        [build: env.BUILD_PRODUCT == 'true',     name: 'product-service', dockerfile: 'services/product/Dockerfile', context: '.'],
+                        [build: env.BUILD_ORDER == 'true',      name: 'order-service',   dockerfile: 'services/order/Dockerfile',   context: '.'],
+                        [build: env.BUILD_PAYMENT == 'true',     name: 'payment-service', dockerfile: 'services/payment/Dockerfile', context: '.'],
                     ]
 
                     withCredentials([usernamePassword(
@@ -213,7 +213,7 @@ pipeline {
 
                         def buildTasks = [:]
                         services.each { svc ->
-                            if (env[svc.flag] == 'true') {
+                            if (svc.build) {
                                 def s = svc
                                 buildTasks[s.name] = {
                                     def img = "${user}/${s.name}"
@@ -245,17 +245,17 @@ pipeline {
                     def user = env.DOCKERHUB_USER
 
                     def serviceMappings = [
-                        [flag: 'BUILD_API_GATEWAY', name: 'api-gateway',     yaml: 'deployment/k8s/07-api-gateway.yaml'],
-                        [flag: 'BUILD_USER',        name: 'user-service',    yaml: 'deployment/k8s/06-user-service.yaml'],
-                        [flag: 'BUILD_FILE',        name: 'file-service',    yaml: 'deployment/k8s/10-file-service.yaml'],
-                        [flag: 'BUILD_PRODUCT',     name: 'product-service', yaml: 'deployment/k8s/11-product-service.yaml'],
-                        [flag: 'BUILD_ORDER',       name: 'order-service',   yaml: 'deployment/k8s/14-order-service.yaml'],
-                        [flag: 'BUILD_PAYMENT',     name: 'payment-service', yaml: 'deployment/k8s/17-payment-service.yaml'],
+                        [build: env.BUILD_API_GATEWAY == 'true', name: 'api-gateway',     yaml: 'deployment/k8s/07-api-gateway.yaml'],
+                        [build: env.BUILD_USER == 'true',        name: 'user-service',    yaml: 'deployment/k8s/06-user-service.yaml'],
+                        [build: env.BUILD_FILE == 'true',        name: 'file-service',    yaml: 'deployment/k8s/10-file-service.yaml'],
+                        [build: env.BUILD_PRODUCT == 'true',     name: 'product-service', yaml: 'deployment/k8s/11-product-service.yaml'],
+                        [build: env.BUILD_ORDER == 'true',       name: 'order-service',   yaml: 'deployment/k8s/14-order-service.yaml'],
+                        [build: env.BUILD_PAYMENT == 'true',     name: 'payment-service', yaml: 'deployment/k8s/17-payment-service.yaml'],
                     ]
 
                     def updated = false
                     serviceMappings.each { svc ->
-                        if (env[svc.flag] == 'true') {
+                        if (svc.build) {
                             sh "sed -i 's|image: .*${svc.name}.*|image: ${user}/${svc.name}:${sha}|g' ${svc.yaml}"
                             updated = true
                         }
@@ -270,8 +270,13 @@ pipeline {
                             sh """
                                 git config user.email "jenkins@uav-store"
                                 git config user.name "Jenkins"
+
                                 git add deployment/k8s/
                                 git diff --staged --quiet || git commit -m "ci: update image tags to ${sha} [ci skip]"
+
+                                git fetch origin dev
+                                git rebase origin/dev
+
                                 git push https://\${GIT_USER}:\${GIT_TOKEN}@github.com/${GITHUB_REPO}.git HEAD:dev
                             """
                         }
