@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: api-gateway
-          image: hmquannnnn/api-gateway:latest
+          image: hmquannnnn/api-gateway:4c9a95c
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
