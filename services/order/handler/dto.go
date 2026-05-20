@@ -80,6 +80,7 @@ type UpdateOrderStatusRequest struct {
 
 type ListOrdersQuery struct {
 	Status string `form:"status"`
+	Search string `form:"search"`
 	Page   int    `form:"page,default=1"`
 	Limit  int    `form:"limit,default=20"`
 }
@@ -93,25 +94,33 @@ type OrderItemResponse struct {
 	Subtotal    float64   `json:"subtotal"`
 }
 
+type CustomerSummaryResponse struct {
+	ID    uuid.UUID `json:"id"`
+	Email string    `json:"email"`
+	Name  string    `json:"name"`
+}
+
 type OrderResponse struct {
-	ID            uuid.UUID           `json:"id"`
-	UserID        uuid.UUID           `json:"user_id"`
-	TotalPrice    float64             `json:"total_price"`
-	Status        model.OrderStatus   `json:"status"`
-	PaymentMethod model.PaymentMethod `json:"payment_method"`
-	Items         []OrderItemResponse `json:"items"`
-	CreatedAt     string              `json:"created_at"`
-	UpdatedAt     string              `json:"updated_at"`
+	ID            uuid.UUID                `json:"id"`
+	UserID        uuid.UUID                `json:"user_id"`
+	Customer      *CustomerSummaryResponse `json:"customer,omitempty"`
+	TotalPrice    float64                  `json:"total_price"`
+	Status        model.OrderStatus        `json:"status"`
+	PaymentMethod model.PaymentMethod      `json:"payment_method"`
+	Items         []OrderItemResponse      `json:"items"`
+	CreatedAt     string                   `json:"created_at"`
+	UpdatedAt     string                   `json:"updated_at"`
 }
 
 type OrderListItemResponse struct {
-	ID            uuid.UUID           `json:"id"`
-	UserID        uuid.UUID           `json:"user_id"`
-	TotalPrice    float64             `json:"total_price"`
-	Status        model.OrderStatus   `json:"status"`
-	PaymentMethod model.PaymentMethod `json:"payment_method"`
-	CreatedAt     string              `json:"created_at"`
-	UpdatedAt     string              `json:"updated_at"`
+	ID            uuid.UUID                `json:"id"`
+	UserID        uuid.UUID                `json:"user_id"`
+	Customer      *CustomerSummaryResponse `json:"customer,omitempty"`
+	TotalPrice    float64                  `json:"total_price"`
+	Status        model.OrderStatus        `json:"status"`
+	PaymentMethod model.PaymentMethod      `json:"payment_method"`
+	CreatedAt     string                   `json:"created_at"`
+	UpdatedAt     string                   `json:"updated_at"`
 }
 
 func ToOrderResponse(o *model.OrderWithItems) *OrderResponse {
@@ -138,6 +147,12 @@ func ToOrderResponse(o *model.OrderWithItems) *OrderResponse {
 	}
 }
 
+func ToAdminOrderResponse(o *model.OrderWithItemsAndCustomer) *OrderResponse {
+	resp := ToOrderResponse(&o.OrderWithItems)
+	resp.Customer = ToCustomerSummaryResponse(o.Customer)
+	return resp
+}
+
 func ToOrderListItemResponse(o *model.Order) *OrderListItemResponse {
 	return &OrderListItemResponse{
 		ID:            o.ID,
@@ -147,5 +162,22 @@ func ToOrderListItemResponse(o *model.Order) *OrderListItemResponse {
 		PaymentMethod: o.PaymentMethod,
 		CreatedAt:     o.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:     o.UpdatedAt.Format(time.RFC3339),
+	}
+}
+
+func ToAdminOrderListItemResponse(o *model.OrderWithCustomer) *OrderListItemResponse {
+	resp := ToOrderListItemResponse(&o.Order)
+	resp.Customer = ToCustomerSummaryResponse(o.Customer)
+	return resp
+}
+
+func ToCustomerSummaryResponse(customer *model.CustomerSummary) *CustomerSummaryResponse {
+	if customer == nil {
+		return nil
+	}
+	return &CustomerSummaryResponse{
+		ID:    customer.ID,
+		Email: customer.Email,
+		Name:  customer.Name,
 	}
 }

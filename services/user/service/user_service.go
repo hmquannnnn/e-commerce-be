@@ -14,6 +14,8 @@ import (
 type UserService interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*model.User, error)
+	SearchUsers(ctx context.Context, query string, limit int) ([]*model.User, error)
+	ListUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]*model.User, error)
 	UpdateUser(ctx context.Context, id uuid.UUID, params UpdateUserParams) (*model.User, error)
 }
 
@@ -58,6 +60,22 @@ func (s *userService) GetUserByEmail(ctx context.Context, email string) (*model.
 		return nil, fmt.Errorf("failed to get user by email: %w", err)
 	}
 	return user, nil
+}
+
+func (s *userService) SearchUsers(ctx context.Context, query string, limit int) ([]*model.User, error) {
+	users, err := s.userRepo.Search(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search users: %w", err)
+	}
+	return users, nil
+}
+
+func (s *userService) ListUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]*model.User, error) {
+	users, err := s.userRepo.ListByIDs(ctx, ids)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list users by ids: %w", err)
+	}
+	return users, nil
 }
 
 // UpdateUser updates user information (PATCH operation - only updates provided fields)

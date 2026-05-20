@@ -10,12 +10,14 @@ type Config struct {
 	App        AppConfig
 	Database   DatabaseConfig
 	ProductSvc ProductServiceConfig
+	UserSvc    UserServiceConfig
 }
 
 type AppConfig struct {
-	Name        string
-	Environment string
-	Port        string
+	Name               string
+	Environment        string
+	Port               string
+	OrderExpiryEnabled bool
 }
 
 type DatabaseConfig struct {
@@ -33,12 +35,17 @@ type ProductServiceConfig struct {
 	URL string
 }
 
+type UserServiceConfig struct {
+	URL string
+}
+
 func Load() (*Config, error) {
 	cfg := &Config{
 		App: AppConfig{
-			Name:        getEnv("APP_NAME", "order-service"),
-			Environment: getEnv("APP_ENV", "development"),
-			Port:        getEnv("APP_PORT", "8085"),
+			Name:               getEnv("APP_NAME", "order-service"),
+			Environment:        getEnv("APP_ENV", "development"),
+			Port:               getEnv("APP_PORT", "8085"),
+			OrderExpiryEnabled: getEnvAsBool("ORDER_EXPIRY_WORKER_ENABLED", true),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -52,6 +59,9 @@ func Load() (*Config, error) {
 		},
 		ProductSvc: ProductServiceConfig{
 			URL: getEnv("PRODUCT_SERVICE_URL", "http://localhost:8083"),
+		},
+		UserSvc: UserServiceConfig{
+			URL: getEnv("USER_SERVICE_URL", "http://localhost:8081"),
 		},
 	}
 
@@ -74,6 +84,9 @@ func (c *Config) Validate() error {
 	}
 	if c.ProductSvc.URL == "" {
 		return fmt.Errorf("PRODUCT_SERVICE_URL is required")
+	}
+	if c.UserSvc.URL == "" {
+		return fmt.Errorf("USER_SERVICE_URL is required")
 	}
 	return nil
 }
@@ -101,6 +114,15 @@ func getEnvAsInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intValue, err := strconv.Atoi(value); err == nil {
 			return intValue
+		}
+	}
+	return defaultValue
+}
+
+func getEnvAsBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if boolValue, err := strconv.ParseBool(value); err == nil {
+			return boolValue
 		}
 	}
 	return defaultValue

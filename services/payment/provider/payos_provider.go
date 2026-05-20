@@ -3,9 +3,11 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/hmquannnnn/e-commerce/payment-service/config"
 	"github.com/hmquannnnn/e-commerce/payment-service/model"
@@ -16,6 +18,8 @@ type PayOSProvider struct {
 	client *payos.PayOS
 	cfg    config.PayOSConfig
 }
+
+var ErrOrderCodeExists = errors.New("payos order code already exists")
 
 func NewPayOSProvider(cfg config.PayOSConfig) (*PayOSProvider, error) {
 	client, err := payos.NewPayOS(&payos.PayOSOptions{
@@ -52,6 +56,9 @@ func (p *PayOSProvider) CreateCheckout(ctx context.Context, req CheckoutRequest)
 		CancelUrl:   cancelURL,
 	})
 	if err != nil {
+		if isOrderCodeExistsError(err) {
+			return nil, fmt.Errorf("%w: %v", ErrOrderCodeExists, err)
+		}
 		return nil, fmt.Errorf("create payos payment link: %w", err)
 	}
 
@@ -61,6 +68,13 @@ func (p *PayOSProvider) CreateCheckout(ctx context.Context, req CheckoutRequest)
 		ProviderPaymentID: result.PaymentLinkId,
 		RawResponse:       raw,
 	}, nil
+}
+
+func isOrderCodeExistsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "code 231")
 }
 
 func (p *PayOSProvider) VerifyCallback(req *http.Request) (*CallbackResult, error) {

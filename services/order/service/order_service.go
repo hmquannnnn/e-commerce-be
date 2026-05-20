@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/hmquannnnn/e-commerce/order-service/client"
@@ -32,8 +33,10 @@ type OrderService interface {
 	GetOrderByID(ctx context.Context, orderID uuid.UUID) (*model.OrderWithItems, error)
 	ListUserOrders(ctx context.Context, userID uuid.UUID, page, limit int) ([]*model.Order, int64, error)
 	CancelOrder(ctx context.Context, userID uuid.UUID, orderID uuid.UUID) error
-	AdminListOrders(ctx context.Context, status *model.OrderStatus, page, limit int) ([]*model.Order, int64, error)
+	AdminListOrders(ctx context.Context, status *model.OrderStatus, search string, page, limit int) ([]*model.OrderWithCustomer, int64, error)
+	AdminGetOrder(ctx context.Context, orderID uuid.UUID) (*model.OrderWithItemsAndCustomer, error)
 	AdminUpdateStatus(ctx context.Context, orderID uuid.UUID, status model.OrderStatus) error
+	TouchPaymentDeadline(ctx context.Context, orderID uuid.UUID) error
 	// MarkOrderPaid transitions a PENDING order to PAID. Idempotent: returns nil
 	// if the order is already PAID. Any other state returns ErrInvalidStatusTransition.
 	// Used by payment-service via internal endpoint after PayOS webhook.
@@ -44,17 +47,20 @@ type orderService struct {
 	orderRepo     repository.OrderRepository
 	cartRepo      repository.CartRepository
 	productClient client.ProductClient
+	userClient    client.UserClient
 }
 
 func NewOrderService(
 	orderRepo repository.OrderRepository,
 	cartRepo repository.CartRepository,
 	productClient client.ProductClient,
+	userClient client.UserClient,
 ) OrderService {
 	return &orderService{
 		orderRepo:     orderRepo,
 		cartRepo:      cartRepo,
 		productClient: productClient,
+		userClient:    userClient,
 	}
 }
 
@@ -202,16 +208,88 @@ func (s *orderService) CancelOrder(ctx context.Context, userID uuid.UUID, orderI
 	return nil
 }
 
-func (s *orderService) AdminListOrders(ctx context.Context, status *model.OrderStatus, page, limit int) ([]*model.Order, int64, error) {
+func (s *orderService) AdminListOrders(ctx context.Context, status *model.OrderStatus, search string, page, limit int) ([]*model.OrderWithCustomer, int64, error) {
+	matchedUserIDs := []uuid.UUID{}
+	if strings.TrimSpace(search) != "" {
+		users, err := s.userClient.SearchUsers(ctx, search, 100)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to search users: %w", err)
+		}
+		for _, user := range users {
+			matchedUserIDs = append(matchedUserIDs, user.ID)
+		}
+	}
+
 	orders, total, err := s.orderRepo.List(ctx, model.ListOrdersFilter{
-		Status: status,
-		Page:   page,
-		Limit:  limit,
+		Status:  status,
+		Search:  search,
+		UserIDs: matchedUserIDs,
+		Page:    page,
+		Limit:   limit,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list orders: %w", err)
 	}
-	return orders, total, nil
+
+	usersByID, err := s.loadCustomerSummaries(ctx, orders)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	items := make([]*model.OrderWithCustomer, 0, len(orders))
+	for _, order := range orders {
+		item := &model.OrderWithCustomer{Order: *order}
+		if customer, ok := usersByID[order.UserID]; ok {
+			item.Customer = customer
+		}
+		items = append(items, item)
+	}
+	return items, total, nil
+}
+
+func (s *orderService) AdminGetOrder(ctx context.Context, orderID uuid.UUID) (*model.OrderWithItemsAndCustomer, error) {
+	order, err := s.GetOrderByID(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	usersByID, err := s.loadCustomerSummaries(ctx, []*model.Order{&order.Order})
+	if err != nil {
+		return nil, err
+	}
+
+	result := &model.OrderWithItemsAndCustomer{OrderWithItems: *order}
+	if customer, ok := usersByID[order.UserID]; ok {
+		result.Customer = customer
+	}
+	return result, nil
+}
+
+func (s *orderService) loadCustomerSummaries(ctx context.Context, orders []*model.Order) (map[uuid.UUID]*model.CustomerSummary, error) {
+	userIDs := make([]uuid.UUID, 0, len(orders))
+	seen := make(map[uuid.UUID]struct{}, len(orders))
+	for _, order := range orders {
+		if _, ok := seen[order.UserID]; ok {
+			continue
+		}
+		seen[order.UserID] = struct{}{}
+		userIDs = append(userIDs, order.UserID)
+	}
+
+	users, err := s.userClient.GetUsersByIDs(ctx, userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load customers: %w", err)
+	}
+
+	result := make(map[uuid.UUID]*model.CustomerSummary, len(users))
+	for id, user := range users {
+		result[id] = &model.CustomerSummary{
+			ID:    user.ID,
+			Email: user.Email,
+			Name:  user.Name,
+		}
+	}
+	return result, nil
 }
 
 // AdminUpdateStatus enforces the order state machine for admin transitions.
@@ -263,6 +341,28 @@ func isValidAdminTransition(from, to model.OrderStatus) bool {
 		return from == model.OrderStatusPending || from == model.OrderStatusPaid
 	}
 	return false
+}
+
+func (s *orderService) TouchPaymentDeadline(ctx context.Context, orderID uuid.UUID) error {
+	order, err := s.orderRepo.GetByID(ctx, orderID)
+	if err != nil {
+		if errors.Is(err, repository.ErrOrderNotFound) {
+			return ErrOrderNotFound
+		}
+		return fmt.Errorf("failed to get order: %w", err)
+	}
+
+	if order.Status != model.OrderStatusPending || order.PaymentMethod == model.PaymentMethodCash {
+		return ErrInvalidStatusTransition
+	}
+
+	if err := s.orderRepo.TouchPaymentDeadline(ctx, orderID); err != nil {
+		if errors.Is(err, repository.ErrOrderNotFound) {
+			return ErrInvalidStatusTransition
+		}
+		return fmt.Errorf("failed to touch payment deadline: %w", err)
+	}
+	return nil
 }
 
 // MarkOrderPaid is the internal-only entrypoint used by payment-service after

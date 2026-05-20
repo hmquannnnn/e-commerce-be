@@ -42,15 +42,20 @@ func main() {
 	slog.Info("connected to database", "host", cfg.Database.Host, "db", cfg.Database.DBName)
 
 	productClient := client.NewProductClient(cfg.ProductSvc.URL)
+	userClient := client.NewUserClient(cfg.UserSvc.URL)
 
 	cartRepo := repository.NewCartRepository(db)
 	orderRepo := repository.NewOrderRepository(db)
 
 	cartSvc := service.NewCartService(cartRepo, productClient)
-	orderSvc := service.NewOrderService(orderRepo, cartRepo, productClient)
+	orderSvc := service.NewOrderService(orderRepo, cartRepo, productClient, userClient)
 
-	expiryWorker := service.NewOrderExpiryWorker(orderRepo, productClient)
-	go expiryWorker.Start(context.Background())
+	if cfg.App.OrderExpiryEnabled {
+		expiryWorker := service.NewOrderExpiryWorker(orderRepo, productClient)
+		go expiryWorker.Start(context.Background())
+	} else {
+		slog.Warn("order expiry worker disabled by config")
+	}
 
 	router := routes.NewRouter(cartSvc, orderSvc)
 	engine := router.SetupRoutes()

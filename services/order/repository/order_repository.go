@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	ErrOrderNotFound           = errors.New("order not found")
-	ErrCartQuantityMismatch    = errors.New("cart quantity mismatch during checkout")
+	ErrOrderNotFound        = errors.New("order not found")
+	ErrCartQuantityMismatch = errors.New("cart quantity mismatch during checkout")
 )
 
 type OrderRepository interface {
@@ -22,6 +22,7 @@ type OrderRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*model.OrderWithItems, error)
 	List(ctx context.Context, filter model.ListOrdersFilter) ([]*model.Order, int64, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status model.OrderStatus) error
+	TouchPaymentDeadline(ctx context.Context, id uuid.UUID) error
 	ListExpiredPendingOrders(ctx context.Context, cutoff time.Time) ([]uuid.UUID, error)
 }
 
@@ -183,6 +184,21 @@ func (r *orderRepository) List(ctx context.Context, filter model.ListOrdersFilte
 		args = append(args, *filter.Status)
 		argIdx++
 	}
+	searchConditions := []string{}
+	if search := strings.TrimSpace(filter.Search); search != "" {
+		searchConditions = append(searchConditions, fmt.Sprintf("id::text ILIKE $%d", argIdx))
+		searchConditions = append(searchConditions, fmt.Sprintf("user_id::text ILIKE $%d", argIdx))
+		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+	for _, userID := range filter.UserIDs {
+		searchConditions = append(searchConditions, fmt.Sprintf("user_id = $%d", argIdx))
+		args = append(args, userID)
+		argIdx++
+	}
+	if len(searchConditions) > 0 {
+		conditions = append(conditions, "("+strings.Join(searchConditions, " OR ")+")")
+	}
 
 	where := ""
 	if len(conditions) > 0 {
@@ -240,12 +256,30 @@ func (r *orderRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status
 	return nil
 }
 
+func (r *orderRepository) TouchPaymentDeadline(ctx context.Context, id uuid.UUID) error {
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE orders
+		SET updated_at = NOW()
+		WHERE id = $1
+		  AND status = 'PENDING'
+		  AND payment_method != 'CASH'
+	`, id)
+	if err != nil {
+		return fmt.Errorf("failed to touch payment deadline: %w", err)
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return ErrOrderNotFound
+	}
+	return nil
+}
+
 func (r *orderRepository) ListExpiredPendingOrders(ctx context.Context, cutoff time.Time) ([]uuid.UUID, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id FROM orders
 		WHERE status = 'PENDING'
 		  AND payment_method != 'CASH'
-		  AND created_at < $1
+		  AND updated_at < $1
 	`, cutoff)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list expired orders: %w", err)

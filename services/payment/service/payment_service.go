@@ -52,6 +52,8 @@ func NewPaymentService(repo repository.PaymentRepository, payosProvider provider
 	}
 }
 
+const maxCreateCheckoutAttempts = 10
+
 func (s *paymentService) CreatePayment(ctx context.Context, input CreatePaymentInput) (*model.Payment, error) {
 	if input.OrderID == "" || input.Amount <= 0 {
 		return nil, ErrInvalidInput
@@ -91,26 +93,27 @@ func (s *paymentService) CreatePayment(ctx context.Context, input CreatePaymentI
 	}
 	// ─────────────────────────────────────────────────────────────────────────
 
-	payosOrderCode, err := s.repo.NextPayosOrderCode(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("generate payos order code: %w", err)
+	paymentID := uuid.New()
+
+	if err := s.orderClient.TouchPaymentDeadline(ctx, orderID); err != nil {
+		if errors.Is(err, client.ErrOrderNotPayable) {
+			return nil, ErrOrderNotPayable
+		}
+		if errors.Is(err, client.ErrOrderNotFound) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("extend payment deadline: %w", err)
 	}
 
-	paymentID := uuid.New()
-	checkoutResp, err := p.CreateCheckout(ctx, provider.CheckoutRequest{
-		PaymentID:      paymentID,
-		OrderID:        input.OrderID,
-		UserID:         input.UserID,
-		Amount:         input.Amount,
-		Currency:       strings.ToLower(input.Currency),
-		ReturnURL:      input.ReturnURL,
-		CancelURL:      input.CancelURL,
-		PaymentMethod:  input.PaymentMethod,
-		Provider:       input.Provider,
-		PayosOrderCode: payosOrderCode,
-	})
+	if existing, ok, err := s.getReusablePayment(ctx, input); err != nil {
+		return nil, err
+	} else if ok {
+		return existing, nil
+	}
+
+	payosOrderCode, checkoutResp, err := s.createCheckoutWithRetry(ctx, p, paymentID, input)
 	if err != nil {
-		return nil, fmt.Errorf("create checkout: %w", err)
+		return nil, err
 	}
 
 	metadata, _ := json.Marshal(map[string]interface{}{
@@ -148,6 +151,76 @@ func (s *paymentService) CreatePayment(ctx context.Context, input CreatePaymentI
 		return nil, fmt.Errorf("persist payment: %w", err)
 	}
 	return s.repo.GetByID(ctx, paymentID)
+}
+
+func (s *paymentService) getReusablePayment(ctx context.Context, input CreatePaymentInput) (*model.Payment, bool, error) {
+	existing, err := s.repo.GetByOrderID(ctx, input.OrderID)
+	if err != nil {
+		if errors.Is(err, repository.ErrPaymentNotFound) {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("check existing payment: %w", err)
+	}
+
+	if existing.UserID != input.UserID ||
+		existing.Provider != input.Provider ||
+		existing.PaymentMethod != input.PaymentMethod ||
+		existing.Amount != input.Amount ||
+		!strings.EqualFold(existing.Currency, input.Currency) ||
+		existing.CheckoutURL == nil ||
+		*existing.CheckoutURL == "" ||
+		!isReusablePaymentStatus(existing.Status) {
+		return nil, false, nil
+	}
+
+	return existing, true, nil
+}
+
+func isReusablePaymentStatus(status model.PaymentStatus) bool {
+	return status == model.StatusPending ||
+		status == model.StatusRequiresAction ||
+		status == model.StatusProcessing
+}
+
+func (s *paymentService) createCheckoutWithRetry(
+	ctx context.Context,
+	p provider.PaymentProvider,
+	paymentID uuid.UUID,
+	input CreatePaymentInput,
+) (int64, *provider.CheckoutResponse, error) {
+	var lastErr error
+
+	for attempt := 1; attempt <= maxCreateCheckoutAttempts; attempt++ {
+		payosOrderCode, err := s.repo.NextPayosOrderCode(ctx)
+		if err != nil {
+			return 0, nil, fmt.Errorf("generate payos order code: %w", err)
+		}
+
+		checkoutResp, err := p.CreateCheckout(ctx, provider.CheckoutRequest{
+			PaymentID:      paymentID,
+			OrderID:        input.OrderID,
+			UserID:         input.UserID,
+			Amount:         input.Amount,
+			Currency:       strings.ToLower(input.Currency),
+			ReturnURL:      input.ReturnURL,
+			CancelURL:      input.CancelURL,
+			PaymentMethod:  input.PaymentMethod,
+			Provider:       input.Provider,
+			PayosOrderCode: payosOrderCode,
+		})
+		if err == nil {
+			return payosOrderCode, checkoutResp, nil
+		}
+		if errors.Is(err, provider.ErrOrderCodeExists) {
+			lastErr = err
+			slog.Warn("payos order code already exists, retrying with a new code",
+				"payos_order_code", payosOrderCode, "attempt", attempt)
+			continue
+		}
+		return 0, nil, fmt.Errorf("create checkout: %w", err)
+	}
+
+	return 0, nil, fmt.Errorf("create checkout: exhausted payos order code retries: %w", lastErr)
 }
 
 func (s *paymentService) GetByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*model.Payment, error) {

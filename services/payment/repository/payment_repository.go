@@ -56,12 +56,12 @@ func NewPaymentRepository(db *sql.DB) PaymentRepository {
 }
 
 func (r *paymentRepository) NextPayosOrderCode(ctx context.Context) (int64, error) {
-	var code int64
-	err := r.db.QueryRowContext(ctx, `SELECT nextval('payos_order_code_seq')`).Scan(&code)
+	var seq int64
+	err := r.db.QueryRowContext(ctx, `SELECT nextval('payos_order_code_seq')`).Scan(&seq)
 	if err != nil {
 		return 0, fmt.Errorf("nextval payos_order_code_seq: %w", err)
 	}
-	return code, nil
+	return time.Now().UnixMilli()*1000 + (seq % 1000), nil
 }
 
 func (r *paymentRepository) CreatePaymentAndAttempt(ctx context.Context, payment *model.Payment, attempt *model.PaymentAttempt) error {

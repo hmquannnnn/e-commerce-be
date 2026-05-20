@@ -66,6 +66,22 @@ type OrderWithItems struct {
 	Items []OrderItem `json:"items"`
 }
 
+type CustomerSummary struct {
+	ID    uuid.UUID `json:"id"`
+	Email string    `json:"email"`
+	Name  string    `json:"name"`
+}
+
+type OrderWithCustomer struct {
+	Order
+	Customer *CustomerSummary `json:"customer,omitempty"`
+}
+
+type OrderWithItemsAndCustomer struct {
+	OrderWithItems
+	Customer *CustomerSummary `json:"customer,omitempty"`
+}
+
 type CreateOrderParams struct {
 	UserID        uuid.UUID
 	PaymentMethod PaymentMethod
@@ -78,8 +94,10 @@ type CheckoutLine struct {
 }
 
 type ListOrdersFilter struct {
-	UserID *uuid.UUID
-	Status *OrderStatus
-	Page   int
-	Limit  int
+	UserID  *uuid.UUID
+	UserIDs []uuid.UUID
+	Status  *OrderStatus
+	Search  string
+	Page    int
+	Limit   int
 }
