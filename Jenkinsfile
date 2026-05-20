@@ -4,6 +4,9 @@ pipeline {
     environment {
         DOCKERHUB_USER = 'hmquannnnn'
         GITHUB_REPO    = 'hmquannnnn/uav-store-be'
+        GITOPS_REPO    = 'hmquannnnn/uav-store-infra'
+        GITOPS_BRANCH  = 'dev'
+        GITOPS_DIR     = 'gitops-repo'
     }
 
     stages {
@@ -186,7 +189,7 @@ pipeline {
             agent {
                 docker {
                     image 'docker:24-cli'
-                    args  '-v /var/run/docker.sock:/var/run/docker.sock -u root'
+                    args  "--entrypoint='' -v /var/run/docker.sock:/var/run/docker.sock -u root"
                     reuseNode true
                 }
             }
@@ -243,6 +246,9 @@ pipeline {
                 script {
                     def sha  = env.GIT_SHA
                     def user = env.DOCKERHUB_USER
+                    def gitopsDir = env.GITOPS_DIR
+                    def branch = env.GITOPS_BRANCH
+                    def gitopsRepo = env.GITOPS_REPO
 
                     def serviceMappings = [
                         [build: env.BUILD_API_GATEWAY == 'true', name: 'api-gateway',     yaml: 'deployment/k8s/07-api-gateway.yaml'],
@@ -256,7 +262,6 @@ pipeline {
                     def updated = false
                     serviceMappings.each { svc ->
                         if (svc.build) {
-                            sh "sed -i 's|image: .*${svc.name}.*|image: ${user}/${svc.name}:${sha}|g' ${svc.yaml}"
                             updated = true
                         }
                     }
@@ -267,17 +272,29 @@ pipeline {
                             usernameVariable: 'GIT_USER',
                             passwordVariable: 'GIT_TOKEN'
                         )]) {
+                            dir(gitopsDir) {
+                                deleteDir()
+                            }
+
+                            sh "git clone --branch ${branch} https://\${GIT_USER}:\${GIT_TOKEN}@github.com/${gitopsRepo}.git ${gitopsDir}"
+
+                            serviceMappings.each { svc ->
+                                if (svc.build) {
+                                    sh "sed -i 's|image: .*${svc.name}.*|image: ${user}/${svc.name}:${sha}|g' ${gitopsDir}/${svc.yaml}"
+                                }
+                            }
+
                             sh """
+                                cd ${gitopsDir}
                                 git config user.email "jenkins@uav-store"
                                 git config user.name "Jenkins"
 
                                 git add deployment/k8s/
                                 git diff --staged --quiet || git commit -m "ci: update image tags to ${sha} [ci skip]"
 
-                                git fetch origin dev
-                                git rebase origin/dev
+                                git pull --rebase origin ${branch}
 
-                                git push https://\${GIT_USER}:\${GIT_TOKEN}@github.com/${GITHUB_REPO}.git HEAD:dev
+                                git push origin HEAD:${branch}
                             """
                         }
                         echo "K8s manifests updated to ${sha}"
