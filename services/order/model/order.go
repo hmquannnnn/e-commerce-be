@@ -42,13 +42,15 @@ func IsValidPaymentMethod(m PaymentMethod) bool {
 }
 
 type Order struct {
-	ID            uuid.UUID     `json:"id"`
-	UserID        uuid.UUID     `json:"user_id"`
-	TotalPrice    float64       `json:"total_price"`
-	Status        OrderStatus   `json:"status"`
-	PaymentMethod PaymentMethod `json:"payment_method"`
-	CreatedAt     time.Time     `json:"created_at"`
-	UpdatedAt     time.Time     `json:"updated_at"`
+	ID              uuid.UUID     `json:"id"`
+	UserID          uuid.UUID     `json:"user_id"`
+	TotalPrice      float64       `json:"total_price"`
+	Status          OrderStatus   `json:"status"`
+	PaymentMethod   PaymentMethod `json:"payment_method"`
+	ShippingPhone   string        `json:"shipping_phone"`
+	ShippingAddress string        `json:"shipping_address"`
+	CreatedAt       time.Time     `json:"created_at"`
+	UpdatedAt       time.Time     `json:"updated_at"`
 }
 
 type OrderItem struct {
@@ -83,8 +85,10 @@ type OrderWithItemsAndCustomer struct {
 }
 
 type CreateOrderParams struct {
-	UserID        uuid.UUID
-	PaymentMethod PaymentMethod
+	UserID          uuid.UUID
+	PaymentMethod   PaymentMethod
+	ShippingPhone   string
+	ShippingAddress string
 }
 
 // CheckoutLine is one product line the client wants to buy from the server-side cart.

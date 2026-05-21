@@ -46,9 +46,11 @@ func main() {
 
 	cartRepo := repository.NewCartRepository(db)
 	orderRepo := repository.NewOrderRepository(db)
+	locationRepo := repository.NewLocationRepository(db)
 
 	cartSvc := service.NewCartService(cartRepo, productClient)
 	orderSvc := service.NewOrderService(orderRepo, cartRepo, productClient, userClient)
+	locationSvc := service.NewLocationService(locationRepo)
 
 	if cfg.App.OrderExpiryEnabled {
 		expiryWorker := service.NewOrderExpiryWorker(orderRepo, productClient)
@@ -57,7 +59,7 @@ func main() {
 		slog.Warn("order expiry worker disabled by config")
 	}
 
-	router := routes.NewRouter(cartSvc, orderSvc)
+	router := routes.NewRouter(cartSvc, orderSvc, locationSvc)
 	engine := router.SetupRoutes()
 
 	addr := ":" + cfg.App.Port

@@ -48,12 +48,13 @@ func (r *orderRepository) Create(ctx context.Context, params *model.CreateOrderP
 
 	order := &model.Order{}
 	err = tx.QueryRowContext(ctx, `
-		INSERT INTO orders (user_id, total_price, status, payment_method)
-		VALUES ($1, $2, 'PENDING', $3)
-		RETURNING id, user_id, total_price, status, payment_method, created_at, updated_at
-	`, params.UserID, totalPrice, params.PaymentMethod).Scan(
+		INSERT INTO orders (user_id, total_price, status, payment_method, shipping_phone, shipping_address)
+		VALUES ($1, $2, 'PENDING', $3, $4, $5)
+		RETURNING id, user_id, total_price, status, payment_method, shipping_phone, shipping_address, created_at, updated_at
+	`, params.UserID, totalPrice, params.PaymentMethod, params.ShippingPhone, params.ShippingAddress).Scan(
 		&order.ID, &order.UserID, &order.TotalPrice,
 		&order.Status, &order.PaymentMethod,
+		&order.ShippingPhone, &order.ShippingAddress,
 		&order.CreatedAt, &order.UpdatedAt,
 	)
 	if err != nil {
@@ -121,11 +122,12 @@ func (r *orderRepository) Create(ctx context.Context, params *model.CreateOrderP
 func (r *orderRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.OrderWithItems, error) {
 	order := &model.Order{}
 	err := r.db.QueryRowContext(ctx, `
-		SELECT id, user_id, total_price, status, payment_method, created_at, updated_at
+		SELECT id, user_id, total_price, status, payment_method, shipping_phone, shipping_address, created_at, updated_at
 		FROM orders WHERE id = $1
 	`, id).Scan(
 		&order.ID, &order.UserID, &order.TotalPrice,
 		&order.Status, &order.PaymentMethod,
+		&order.ShippingPhone, &order.ShippingAddress,
 		&order.CreatedAt, &order.UpdatedAt,
 	)
 	if err != nil {
@@ -188,6 +190,8 @@ func (r *orderRepository) List(ctx context.Context, filter model.ListOrdersFilte
 	if search := strings.TrimSpace(filter.Search); search != "" {
 		searchConditions = append(searchConditions, fmt.Sprintf("id::text ILIKE $%d", argIdx))
 		searchConditions = append(searchConditions, fmt.Sprintf("user_id::text ILIKE $%d", argIdx))
+		searchConditions = append(searchConditions, fmt.Sprintf("shipping_phone ILIKE $%d", argIdx))
+		searchConditions = append(searchConditions, fmt.Sprintf("shipping_address ILIKE $%d", argIdx))
 		args = append(args, "%"+search+"%")
 		argIdx++
 	}
@@ -216,7 +220,7 @@ func (r *orderRepository) List(ctx context.Context, filter model.ListOrdersFilte
 	offset := (filter.Page - 1) * filter.Limit
 	dataArgs := append(args, filter.Limit, offset)
 	rows, err := r.db.QueryContext(ctx, fmt.Sprintf(`
-		SELECT id, user_id, total_price, status, payment_method, created_at, updated_at
+		SELECT id, user_id, total_price, status, payment_method, shipping_phone, shipping_address, created_at, updated_at
 		FROM orders %s
 		ORDER BY created_at DESC
 		LIMIT $%d OFFSET $%d
@@ -232,6 +236,7 @@ func (r *orderRepository) List(ctx context.Context, filter model.ListOrdersFilte
 		if err := rows.Scan(
 			&o.ID, &o.UserID, &o.TotalPrice,
 			&o.Status, &o.PaymentMethod,
+			&o.ShippingPhone, &o.ShippingAddress,
 			&o.CreatedAt, &o.UpdatedAt,
 		); err != nil {
 			return nil, 0, fmt.Errorf("failed to scan order: %w", err)
