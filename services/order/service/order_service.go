@@ -28,7 +28,7 @@ func mergeCheckoutLines(lines []model.CheckoutLine) (map[uuid.UUID]int, error) {
 }
 
 type OrderService interface {
-	CreateOrder(ctx context.Context, userID uuid.UUID, paymentMethod model.PaymentMethod, lines []model.CheckoutLine) (*model.OrderWithItems, error)
+	CreateOrder(ctx context.Context, params model.CreateOrderParams, lines []model.CheckoutLine) (*model.OrderWithItems, error)
 	GetOrder(ctx context.Context, userID uuid.UUID, orderID uuid.UUID) (*model.OrderWithItems, error)
 	GetOrderByID(ctx context.Context, orderID uuid.UUID) (*model.OrderWithItems, error)
 	ListUserOrders(ctx context.Context, userID uuid.UUID, page, limit int) ([]*model.Order, int64, error)
@@ -64,8 +64,15 @@ func NewOrderService(
 	}
 }
 
-func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, paymentMethod model.PaymentMethod, lines []model.CheckoutLine) (*model.OrderWithItems, error) {
-	if !model.IsValidPaymentMethod(paymentMethod) {
+func (s *orderService) CreateOrder(ctx context.Context, params model.CreateOrderParams, lines []model.CheckoutLine) (*model.OrderWithItems, error) {
+	params.ShippingPhone = strings.TrimSpace(params.ShippingPhone)
+	params.ShippingAddress = strings.TrimSpace(params.ShippingAddress)
+	if !model.IsValidPaymentMethod(params.PaymentMethod) ||
+		params.UserID == uuid.Nil ||
+		params.ShippingPhone == "" ||
+		params.ShippingAddress == "" ||
+		len(params.ShippingPhone) > 20 ||
+		len(params.ShippingAddress) > 500 {
 		return nil, ErrInvalidInput
 	}
 
@@ -74,7 +81,7 @@ func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, paymen
 		return nil, err
 	}
 
-	cartItems, err := s.cartRepo.GetByUserID(ctx, userID)
+	cartItems, err := s.cartRepo.GetByUserID(ctx, params.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cart: %w", err)
 	}
@@ -121,10 +128,7 @@ func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, paymen
 		})
 	}
 
-	order, err := s.orderRepo.Create(ctx, &model.CreateOrderParams{
-		UserID:        userID,
-		PaymentMethod: paymentMethod,
-	}, orderLines, userID, merged)
+	order, err := s.orderRepo.Create(ctx, &params, orderLines, params.UserID, merged)
 	if err != nil {
 		for _, r := range reserved {
 			_ = s.productClient.ReleaseInventory(ctx, r)

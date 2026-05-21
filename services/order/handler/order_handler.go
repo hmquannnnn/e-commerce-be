@@ -36,7 +36,12 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		lines = append(lines, model.CheckoutLine{ProductID: it.ProductID, Quantity: it.Quantity})
 	}
 
-	order, err := h.orderService.CreateOrder(c.Request.Context(), userID, model.PaymentMethod(req.PaymentMethod), lines)
+	order, err := h.orderService.CreateOrder(c.Request.Context(), model.CreateOrderParams{
+		UserID:          userID,
+		PaymentMethod:   model.PaymentMethod(req.PaymentMethod),
+		ShippingPhone:   req.ShippingPhone,
+		ShippingAddress: req.ShippingAddress,
+	}, lines)
 	if err != nil {
 		if errors.Is(err, service.ErrCartEmpty) {
 			respondError(c, http.StatusBadRequest, "CART_EMPTY", "Cart is empty")
@@ -44,6 +49,10 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		}
 		if errors.Is(err, service.ErrInvalidOrderLines) {
 			respondError(c, http.StatusBadRequest, "INVALID_ORDER_ITEMS", "Items must exist in cart and quantities must not exceed cart")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidInput) {
+			respondError(c, http.StatusBadRequest, "INVALID_SHIPPING_INFO", "Shipping phone and address are required")
 			return
 		}
 		if errors.Is(err, service.ErrCartChanged) {

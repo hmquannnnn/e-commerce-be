@@ -9,14 +9,16 @@ import (
 )
 
 type Router struct {
-	cartHandler  *handler.CartHandler
-	orderHandler *handler.OrderHandler
+	cartHandler     *handler.CartHandler
+	orderHandler    *handler.OrderHandler
+	locationHandler *handler.LocationHandler
 }
 
-func NewRouter(cartService service.CartService, orderService service.OrderService) *Router {
+func NewRouter(cartService service.CartService, orderService service.OrderService, locationService service.LocationService) *Router {
 	return &Router{
-		cartHandler:  handler.NewCartHandler(cartService),
-		orderHandler: handler.NewOrderHandler(orderService),
+		cartHandler:     handler.NewCartHandler(cartService),
+		orderHandler:    handler.NewOrderHandler(orderService),
+		locationHandler: handler.NewLocationHandler(locationService),
 	}
 }
 
@@ -27,6 +29,14 @@ func (r *Router) SetupRoutes() *gin.Engine {
 
 	router.GET("/health", r.healthCheck)
 	router.GET("/api/health", r.healthCheck)
+
+	locations := router.Group("/api/locations")
+	{
+		locations.GET("/provinces", r.locationHandler.ListProvinces)
+		locations.GET("/cities", r.locationHandler.ListProvinces)
+		locations.GET("/districts", r.locationHandler.ListDistricts)
+		locations.GET("/wards", r.locationHandler.ListWards)
+	}
 
 	v1 := router.Group("/api")
 	v1.Use(RequireAuth())

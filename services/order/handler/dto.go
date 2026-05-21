@@ -66,8 +66,10 @@ type CreateOrderItemRequest struct {
 }
 
 type CreateOrderRequest struct {
-	PaymentMethod string                   `json:"payment_method" binding:"required,oneof=QR_CODE CASH"`
-	Items         []CreateOrderItemRequest `json:"items" binding:"required,min=1,dive"`
+	PaymentMethod   string                   `json:"payment_method" binding:"required,oneof=QR_CODE CASH"`
+	ShippingPhone   string                   `json:"shipping_phone" binding:"required,max=20"`
+	ShippingAddress string                   `json:"shipping_address" binding:"required,max=500"`
+	Items           []CreateOrderItemRequest `json:"items" binding:"required,min=1,dive"`
 }
 
 // UpdateOrderStatusRequest is used by the admin endpoint. It only accepts the
@@ -101,26 +103,30 @@ type CustomerSummaryResponse struct {
 }
 
 type OrderResponse struct {
-	ID            uuid.UUID                `json:"id"`
-	UserID        uuid.UUID                `json:"user_id"`
-	Customer      *CustomerSummaryResponse `json:"customer,omitempty"`
-	TotalPrice    float64                  `json:"total_price"`
-	Status        model.OrderStatus        `json:"status"`
-	PaymentMethod model.PaymentMethod      `json:"payment_method"`
-	Items         []OrderItemResponse      `json:"items"`
-	CreatedAt     string                   `json:"created_at"`
-	UpdatedAt     string                   `json:"updated_at"`
+	ID              uuid.UUID                `json:"id"`
+	UserID          uuid.UUID                `json:"user_id"`
+	Customer        *CustomerSummaryResponse `json:"customer,omitempty"`
+	TotalPrice      float64                  `json:"total_price"`
+	Status          model.OrderStatus        `json:"status"`
+	PaymentMethod   model.PaymentMethod      `json:"payment_method"`
+	ShippingPhone   string                   `json:"shipping_phone"`
+	ShippingAddress string                   `json:"shipping_address"`
+	Items           []OrderItemResponse      `json:"items"`
+	CreatedAt       string                   `json:"created_at"`
+	UpdatedAt       string                   `json:"updated_at"`
 }
 
 type OrderListItemResponse struct {
-	ID            uuid.UUID                `json:"id"`
-	UserID        uuid.UUID                `json:"user_id"`
-	Customer      *CustomerSummaryResponse `json:"customer,omitempty"`
-	TotalPrice    float64                  `json:"total_price"`
-	Status        model.OrderStatus        `json:"status"`
-	PaymentMethod model.PaymentMethod      `json:"payment_method"`
-	CreatedAt     string                   `json:"created_at"`
-	UpdatedAt     string                   `json:"updated_at"`
+	ID              uuid.UUID                `json:"id"`
+	UserID          uuid.UUID                `json:"user_id"`
+	Customer        *CustomerSummaryResponse `json:"customer,omitempty"`
+	TotalPrice      float64                  `json:"total_price"`
+	Status          model.OrderStatus        `json:"status"`
+	PaymentMethod   model.PaymentMethod      `json:"payment_method"`
+	ShippingPhone   string                   `json:"shipping_phone"`
+	ShippingAddress string                   `json:"shipping_address"`
+	CreatedAt       string                   `json:"created_at"`
+	UpdatedAt       string                   `json:"updated_at"`
 }
 
 func ToOrderResponse(o *model.OrderWithItems) *OrderResponse {
@@ -136,14 +142,16 @@ func ToOrderResponse(o *model.OrderWithItems) *OrderResponse {
 		})
 	}
 	return &OrderResponse{
-		ID:            o.ID,
-		UserID:        o.UserID,
-		TotalPrice:    o.TotalPrice,
-		Status:        o.Status,
-		PaymentMethod: o.PaymentMethod,
-		Items:         items,
-		CreatedAt:     o.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:     o.UpdatedAt.Format(time.RFC3339),
+		ID:              o.ID,
+		UserID:          o.UserID,
+		TotalPrice:      o.TotalPrice,
+		Status:          o.Status,
+		PaymentMethod:   o.PaymentMethod,
+		ShippingPhone:   o.ShippingPhone,
+		ShippingAddress: o.ShippingAddress,
+		Items:           items,
+		CreatedAt:       o.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:       o.UpdatedAt.Format(time.RFC3339),
 	}
 }
 
@@ -155,13 +163,15 @@ func ToAdminOrderResponse(o *model.OrderWithItemsAndCustomer) *OrderResponse {
 
 func ToOrderListItemResponse(o *model.Order) *OrderListItemResponse {
 	return &OrderListItemResponse{
-		ID:            o.ID,
-		UserID:        o.UserID,
-		TotalPrice:    o.TotalPrice,
-		Status:        o.Status,
-		PaymentMethod: o.PaymentMethod,
-		CreatedAt:     o.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:     o.UpdatedAt.Format(time.RFC3339),
+		ID:              o.ID,
+		UserID:          o.UserID,
+		TotalPrice:      o.TotalPrice,
+		Status:          o.Status,
+		PaymentMethod:   o.PaymentMethod,
+		ShippingPhone:   o.ShippingPhone,
+		ShippingAddress: o.ShippingAddress,
+		CreatedAt:       o.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:       o.UpdatedAt.Format(time.RFC3339),
 	}
 }
 

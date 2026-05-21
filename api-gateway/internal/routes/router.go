@@ -43,6 +43,10 @@ func SetupRouter(userServiceURL string, fileServiceURL string, productServiceURL
 		v1.GET("/products/:id", productServiceReverseProxy)
 		v1.GET("/categories", productServiceReverseProxy)
 		v1.GET("/categories/:id", productServiceReverseProxy)
+		v1.GET("/locations/provinces", orderServiceReverseProxy)
+		v1.GET("/locations/cities", orderServiceReverseProxy)
+		v1.GET("/locations/districts", orderServiceReverseProxy)
+		v1.GET("/locations/wards", orderServiceReverseProxy)
 
 		// Public payment webhook (PayOS)
 		v1.POST("/payments/webhook/payos", paymentServiceReverseProxy)
