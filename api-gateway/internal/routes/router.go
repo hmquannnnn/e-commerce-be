@@ -100,13 +100,6 @@ func SetupRouter(userServiceURL string, fileServiceURL string, productServiceURL
 				inventory.PATCH("/:product_id/stock", productServiceReverseProxy)
 			}
 
-			// Internal inventory (service-to-service)
-			internal := protected.Group("/internal/inventory")
-			{
-				internal.POST("/reserve", productServiceReverseProxy)
-				internal.POST("/release", productServiceReverseProxy)
-			}
-
 			// Cart routes
 			cart := protected.Group("/cart")
 			{

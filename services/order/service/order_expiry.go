@@ -66,12 +66,7 @@ func (w *OrderExpiryWorker) cancelExpiredOrders(ctx context.Context) {
 			continue
 		}
 
-		for _, item := range order.Items {
-			_ = w.productClient.ReleaseInventory(ctx, client.InventoryItem{
-				ProductID: item.ProductID,
-				Quantity:  item.Quantity,
-			})
-		}
+		_ = w.productClient.ReleaseInventory(ctx, orderItemsToInventoryItems(order.Items))
 
 		if err := w.orderRepo.UpdateStatus(ctx, orderID, model.OrderStatusCancelled); err != nil {
 			slog.Error("expiry: failed to cancel order", "error", err, "order_id", orderID)

@@ -28,11 +28,12 @@ type UpdateCategoryParams struct {
 }
 
 type categoryService struct {
-	repo repository.CategoryRepository
+	repo        repository.CategoryRepository
+	productRepo repository.ProductRepository
 }
 
-func NewCategoryService(repo repository.CategoryRepository) CategoryService {
-	return &categoryService{repo: repo}
+func NewCategoryService(repo repository.CategoryRepository, productRepo repository.ProductRepository) CategoryService {
+	return &categoryService{repo: repo, productRepo: productRepo}
 }
 
 func (s *categoryService) CreateCategory(ctx context.Context, params CreateCategoryParams) (*model.Category, error) {
@@ -87,6 +88,14 @@ func (s *categoryService) UpdateCategory(ctx context.Context, id int, params Upd
 }
 
 func (s *categoryService) DeleteCategory(ctx context.Context, id int) error {
+	count, err := s.productRepo.CountByCategory(ctx, id)
+	if err != nil {
+		return fmt.Errorf("failed to check products in category: %w", err)
+	}
+	if count > 0 {
+		return ErrCategoryHasProducts
+	}
+
 	if err := s.repo.Delete(ctx, id); err != nil {
 		if errors.Is(err, repository.ErrCategoryNotFound) {
 			return ErrCategoryNotFound

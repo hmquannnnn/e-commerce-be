@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/google/uuid"
 	"github.com/hmquannnnn/e-commerce/pkg/common/utils"
@@ -12,8 +13,8 @@ import (
 )
 
 var (
-	ErrInventoryNotFound    = errors.New("inventory not found")
-	ErrInsufficientStock    = errors.New("insufficient stock")
+	ErrInventoryNotFound = errors.New("inventory not found")
+	ErrInsufficientStock = errors.New("insufficient stock")
 )
 
 type InventoryRepository interface {
@@ -21,7 +22,9 @@ type InventoryRepository interface {
 	GetByProductID(ctx context.Context, productID uuid.UUID) (*model.Inventory, error)
 	UpdateStock(ctx context.Context, productID uuid.UUID, params *model.UpdateInventoryParams) error
 	ReserveStock(ctx context.Context, params *model.ReserveStockParams) error
+	ReserveStocks(ctx context.Context, params []model.ReserveStockParams) error
 	ReleaseStock(ctx context.Context, params *model.ReleaseStockParams) error
+	ReleaseStocks(ctx context.Context, params []model.ReleaseStockParams) error
 }
 
 type inventoryRepository struct {
@@ -90,19 +93,28 @@ func (r *inventoryRepository) UpdateStock(ctx context.Context, productID uuid.UU
 }
 
 func (r *inventoryRepository) ReserveStock(ctx context.Context, params *model.ReserveStockParams) error {
+	return r.reserveStock(ctx, r.db, params)
+}
+
+type sqlExecutor interface {
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+}
+
+func (r *inventoryRepository) reserveStock(ctx context.Context, exec sqlExecutor, params *model.ReserveStockParams) error {
 	query := `
 		UPDATE inventory
 		SET reserved_quantity = reserved_quantity + $1, updated_at = NOW()
 		WHERE product_id = $2
 		  AND (stock_quantity - reserved_quantity) >= $1
 	`
-	result, err := r.db.ExecContext(ctx, query, params.Quantity, params.ProductID)
+	result, err := exec.ExecContext(ctx, query, params.Quantity, params.ProductID)
 	if err != nil {
 		return fmt.Errorf("failed to reserve stock: %w", err)
 	}
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		inv, err := r.GetByProductID(ctx, params.ProductID)
+		inv, err := r.getByProductID(ctx, exec, params.ProductID)
 		if err != nil {
 			return ErrInventoryNotFound
 		}
@@ -114,13 +126,45 @@ func (r *inventoryRepository) ReserveStock(ctx context.Context, params *model.Re
 	return nil
 }
 
+func (r *inventoryRepository) ReserveStocks(ctx context.Context, params []model.ReserveStockParams) error {
+	if len(params) == 0 {
+		return nil
+	}
+
+	ordered := append([]model.ReserveStockParams(nil), params...)
+	sort.Slice(ordered, func(i, j int) bool {
+		return ordered[i].ProductID.String() < ordered[j].ProductID.String()
+	})
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin inventory transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	for i := range ordered {
+		if err := r.reserveStock(ctx, tx, &ordered[i]); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit inventory transaction: %w", err)
+	}
+	return nil
+}
+
 func (r *inventoryRepository) ReleaseStock(ctx context.Context, params *model.ReleaseStockParams) error {
+	return r.releaseStock(ctx, r.db, params)
+}
+
+func (r *inventoryRepository) releaseStock(ctx context.Context, exec sqlExecutor, params *model.ReleaseStockParams) error {
 	query := `
 		UPDATE inventory
 		SET reserved_quantity = GREATEST(0, reserved_quantity - $1), updated_at = NOW()
 		WHERE product_id = $2
 	`
-	result, err := r.db.ExecContext(ctx, query, params.Quantity, params.ProductID)
+	result, err := exec.ExecContext(ctx, query, params.Quantity, params.ProductID)
 	if err != nil {
 		return fmt.Errorf("failed to release stock: %w", err)
 	}
@@ -129,4 +173,51 @@ func (r *inventoryRepository) ReleaseStock(ctx context.Context, params *model.Re
 		return ErrInventoryNotFound
 	}
 	return nil
+}
+
+func (r *inventoryRepository) ReleaseStocks(ctx context.Context, params []model.ReleaseStockParams) error {
+	if len(params) == 0 {
+		return nil
+	}
+
+	ordered := append([]model.ReleaseStockParams(nil), params...)
+	sort.Slice(ordered, func(i, j int) bool {
+		return ordered[i].ProductID.String() < ordered[j].ProductID.String()
+	})
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin inventory transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	for i := range ordered {
+		if err := r.releaseStock(ctx, tx, &ordered[i]); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit inventory transaction: %w", err)
+	}
+	return nil
+}
+
+func (r *inventoryRepository) getByProductID(ctx context.Context, exec sqlExecutor, productID uuid.UUID) (*model.Inventory, error) {
+	query := `
+		SELECT id, product_id, stock_quantity, reserved_quantity, created_at, updated_at
+		FROM inventory WHERE product_id = $1
+	`
+	inv := &model.Inventory{}
+	err := exec.QueryRowContext(ctx, query, productID).Scan(
+		&inv.ID, &inv.ProductID, &inv.StockQuantity, &inv.ReservedQuantity,
+		&inv.CreatedAt, &inv.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrInventoryNotFound
+		}
+		return nil, fmt.Errorf("failed to get inventory: %w", err)
+	}
+	return inv, nil
 }

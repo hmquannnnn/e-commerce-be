@@ -69,17 +69,6 @@ func (r *Router) SetupRoutes() *gin.Engine {
 		}
 	}
 
-	// Internal routes (không cần auth — chỉ dùng cho service-to-service call)
-	internal := router.Group("/internal")
-	{
-		internal.GET("/orders/:id", r.orderHandler.InternalGetOrder)
-		// Replaces the old PATCH /internal/orders/:id/status — payment-service only
-		// ever needs to flip PENDING → PAID, and the narrow endpoint makes the
-		// state-machine guard explicit.
-		internal.POST("/orders/:id/mark-paid", r.orderHandler.InternalMarkPaid)
-		internal.POST("/orders/:id/touch-payment-deadline", r.orderHandler.InternalTouchPaymentDeadline)
-	}
-
 	return router
 }
 

@@ -24,6 +24,7 @@ type AppConfig struct {
 	Name        string
 	Environment string
 	Port        string
+	GRPCPort    string
 }
 
 type DatabaseConfig struct {
@@ -43,6 +44,7 @@ func Load() (*Config, error) {
 			Name:        getEnv("APP_NAME", "product-service"),
 			Environment: getEnv("APP_ENV", "development"),
 			Port:        getEnv("APP_PORT", "8083"),
+			GRPCPort:    getEnv("GRPC_PORT", "9083"),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),

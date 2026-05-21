@@ -7,10 +7,10 @@ import (
 )
 
 type Config struct {
-	App             AppConfig
-	Database        DatabaseConfig
-	PayOS           PayOSConfig
-	OrderServiceURL string
+	App                     AppConfig
+	Database                DatabaseConfig
+	PayOS                   PayOSConfig
+	OrderServiceGRPCAddress string
 }
 
 type AppConfig struct {
@@ -62,7 +62,7 @@ func Load() (*Config, error) {
 			ReturnURL:   getEnv("PAYOS_RETURN_URL", "http://localhost:3000/en/payment/result"),
 			CancelURL:   getEnv("PAYOS_CANCEL_URL", "http://localhost:3000/en/payment/result?state=cancel"),
 		},
-		OrderServiceURL: getEnv("ORDER_SERVICE_URL", "http://localhost:8085"),
+		OrderServiceGRPCAddress: getEnv("ORDER_SERVICE_GRPC_ADDRESS", "localhost:9085"),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -74,6 +74,9 @@ func Load() (*Config, error) {
 func (c *Config) Validate() error {
 	if c.Database.Host == "" || c.Database.User == "" || c.Database.DBName == "" {
 		return fmt.Errorf("database config is required")
+	}
+	if c.OrderServiceGRPCAddress == "" {
+		return fmt.Errorf("ORDER_SERVICE_GRPC_ADDRESS is required")
 	}
 	return nil
 }

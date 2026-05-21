@@ -2,18 +2,41 @@ package main
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"time"
 
+	inventorypb "github.com/hmquannnnn/e-commerce/pkg/proto/inventory"
 	"github.com/hmquannnnn/e-commerce/pkg/storage"
 	"github.com/hmquannnnn/e-commerce/pkg/storage/minio"
 	"github.com/hmquannnnn/e-commerce/product-service/config"
+	grpcserver "github.com/hmquannnnn/e-commerce/product-service/grpc"
 	"github.com/hmquannnnn/e-commerce/product-service/internal/db"
 	"github.com/hmquannnnn/e-commerce/product-service/repository"
 	"github.com/hmquannnnn/e-commerce/product-service/routes"
 	"github.com/hmquannnnn/e-commerce/product-service/service"
 	"github.com/joho/godotenv"
+	"google.golang.org/grpc"
 )
+
+func startGRPCServer(port string, inventoryService service.InventoryService) *grpc.Server {
+	listener, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		log.Fatalf("Failed to listen on gRPC port %s: %v", port, err)
+	}
+
+	server := grpc.NewServer()
+	inventorypb.RegisterInventoryServiceServer(server, grpcserver.NewInventoryServer(inventoryService))
+
+	go func() {
+		log.Printf("gRPC server starting on port %s", port)
+		if err := server.Serve(listener); err != nil {
+			log.Fatalf("Failed to start gRPC server: %v", err)
+		}
+	}()
+
+	return server
+}
 
 func runServer() {
 	if err := godotenv.Load(); err != nil {
@@ -57,10 +80,13 @@ func runServer() {
 	inventoryRepo := repository.NewInventoryRepository(database)
 	log.Println("✓ Repositories initialized")
 
-	categoryService := service.NewCategoryService(categoryRepo)
+	categoryService := service.NewCategoryService(categoryRepo, productRepo)
 	inventoryService := service.NewInventoryService(inventoryRepo)
 	productService := service.NewProductService(productRepo, inventoryRepo, minioClient, cfg.MinIO.BucketName)
 	log.Println("✓ Services initialized")
+
+	grpcServer := startGRPCServer(cfg.App.GRPCPort, inventoryService)
+	defer grpcServer.GracefulStop()
 
 	router := routes.NewRouter(categoryService, productService, inventoryService)
 	handler := router.SetupRoutes()
