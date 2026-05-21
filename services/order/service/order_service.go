@@ -27,6 +27,28 @@ func mergeCheckoutLines(lines []model.CheckoutLine) (map[uuid.UUID]int, error) {
 	return merged, nil
 }
 
+func cartLinesToInventoryItems(items []*model.CartItem) []client.InventoryItem {
+	result := make([]client.InventoryItem, 0, len(items))
+	for _, item := range items {
+		result = append(result, client.InventoryItem{
+			ProductID: item.ProductID,
+			Quantity:  item.Quantity,
+		})
+	}
+	return result
+}
+
+func orderItemsToInventoryItems(items []model.OrderItem) []client.InventoryItem {
+	result := make([]client.InventoryItem, 0, len(items))
+	for _, item := range items {
+		result = append(result, client.InventoryItem{
+			ProductID: item.ProductID,
+			Quantity:  item.Quantity,
+		})
+	}
+	return result
+}
+
 type OrderService interface {
 	CreateOrder(ctx context.Context, params model.CreateOrderParams, lines []model.CheckoutLine) (*model.OrderWithItems, error)
 	GetOrder(ctx context.Context, userID uuid.UUID, orderID uuid.UUID) (*model.OrderWithItems, error)
@@ -39,8 +61,8 @@ type OrderService interface {
 	TouchPaymentDeadline(ctx context.Context, orderID uuid.UUID) error
 	// MarkOrderPaid transitions a PENDING order to PAID. Idempotent: returns nil
 	// if the order is already PAID. Any other state returns ErrInvalidStatusTransition.
-	// Used by payment-service via internal endpoint after PayOS webhook.
-	MarkOrderPaid(ctx context.Context, orderID uuid.UUID) error
+	// Used by payment-service via gRPC after PayOS webhook.
+	MarkOrderPaid(ctx context.Context, orderID uuid.UUID, amount int64) error
 }
 
 type orderService struct {
@@ -105,34 +127,20 @@ func (s *orderService) CreateOrder(ctx context.Context, params model.CreateOrder
 		orderLines = append(orderLines, &line)
 	}
 
-	reserved := make([]client.InventoryItem, 0, len(orderLines))
-	for _, item := range orderLines {
-		if err := s.productClient.ReserveInventory(ctx, client.InventoryItem{
-			ProductID: item.ProductID,
-			Quantity:  item.Quantity,
-		}); err != nil {
-			for _, r := range reserved {
-				_ = s.productClient.ReleaseInventory(ctx, r)
-			}
-			if errors.Is(err, client.ErrInsufficientStock) {
-				return nil, ErrInsufficientStock
-			}
-			if errors.Is(err, client.ErrProductNotFound) {
-				return nil, ErrProductNotFound
-			}
-			return nil, fmt.Errorf("failed to reserve inventory: %w", err)
+	reserved := cartLinesToInventoryItems(orderLines)
+	if err := s.productClient.ReserveInventory(ctx, reserved); err != nil {
+		if errors.Is(err, client.ErrInsufficientStock) {
+			return nil, ErrInsufficientStock
 		}
-		reserved = append(reserved, client.InventoryItem{
-			ProductID: item.ProductID,
-			Quantity:  item.Quantity,
-		})
+		if errors.Is(err, client.ErrProductNotFound) {
+			return nil, ErrProductNotFound
+		}
+		return nil, fmt.Errorf("failed to reserve inventory: %w", err)
 	}
 
 	order, err := s.orderRepo.Create(ctx, &params, orderLines, params.UserID, merged)
 	if err != nil {
-		for _, r := range reserved {
-			_ = s.productClient.ReleaseInventory(ctx, r)
-		}
+		_ = s.productClient.ReleaseInventory(ctx, reserved)
 		if errors.Is(err, repository.ErrCartQuantityMismatch) {
 			return nil, ErrCartChanged
 		}
@@ -198,13 +206,7 @@ func (s *orderService) CancelOrder(ctx context.Context, userID uuid.UUID, orderI
 		return ErrOrderNotCancellable
 	}
 
-	// Release inventory
-	for _, item := range order.Items {
-		_ = s.productClient.ReleaseInventory(ctx, client.InventoryItem{
-			ProductID: item.ProductID,
-			Quantity:  item.Quantity,
-		})
-	}
+	_ = s.productClient.ReleaseInventory(ctx, orderItemsToInventoryItems(order.Items))
 
 	if err := s.orderRepo.UpdateStatus(ctx, orderID, model.OrderStatusCancelled); err != nil {
 		return fmt.Errorf("failed to cancel order: %w", err)
@@ -318,12 +320,7 @@ func (s *orderService) AdminUpdateStatus(ctx context.Context, orderID uuid.UUID,
 	}
 
 	if target == model.OrderStatusCancelled {
-		for _, item := range order.Items {
-			_ = s.productClient.ReleaseInventory(ctx, client.InventoryItem{
-				ProductID: item.ProductID,
-				Quantity:  item.Quantity,
-			})
-		}
+		_ = s.productClient.ReleaseInventory(ctx, orderItemsToInventoryItems(order.Items))
 	}
 
 	if err := s.orderRepo.UpdateStatus(ctx, orderID, target); err != nil {
@@ -375,7 +372,11 @@ func (s *orderService) TouchPaymentDeadline(ctx context.Context, orderID uuid.UU
 // admin shipped a CASH order, etc.) the call returns ErrInvalidStatusTransition
 // so the caller can log/alert without overwriting business state. Already-PAID
 // is treated as a no-op for webhook-retry safety.
-func (s *orderService) MarkOrderPaid(ctx context.Context, orderID uuid.UUID) error {
+func (s *orderService) MarkOrderPaid(ctx context.Context, orderID uuid.UUID, amount int64) error {
+	if amount <= 0 {
+		return ErrInvalidInput
+	}
+
 	order, err := s.orderRepo.GetByID(ctx, orderID)
 	if err != nil {
 		if errors.Is(err, repository.ErrOrderNotFound) {
@@ -384,10 +385,15 @@ func (s *orderService) MarkOrderPaid(ctx context.Context, orderID uuid.UUID) err
 		return fmt.Errorf("failed to get order: %w", err)
 	}
 
+	expectedAmount := int64(math.Round(order.TotalPrice))
+	if diff := amount - expectedAmount; diff < -1 || diff > 1 {
+		return ErrAmountMismatch
+	}
+
 	if order.Status == model.OrderStatusPaid {
 		return nil
 	}
-	if order.Status != model.OrderStatusPending {
+	if order.Status != model.OrderStatusPending || order.PaymentMethod == model.PaymentMethodCash {
 		return ErrInvalidStatusTransition
 	}
 

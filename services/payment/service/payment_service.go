@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"net/http"
 	"strings"
 
@@ -72,22 +71,24 @@ func (s *paymentService) CreatePayment(ctx context.Context, input CreatePaymentI
 	if err != nil {
 		return nil, ErrInvalidInput
 	}
-	orderInfo, err := s.orderClient.GetOrder(ctx, orderID)
+	orderInfo, err := s.orderClient.GetOrder(ctx, orderID, input.UserID)
 	if err != nil {
 		if errors.Is(err, client.ErrOrderNotFound) {
 			return nil, ErrOrderNotFound
+		}
+		if errors.Is(err, client.ErrOrderNotPayable) {
+			return nil, ErrOrderNotPayable
 		}
 		return nil, fmt.Errorf("validate order: %w", err)
 	}
 	if orderInfo.UserID != input.UserID {
 		return nil, ErrForbidden
 	}
-	if orderInfo.Status != "PENDING" {
+	if orderInfo.Status != "PENDING" || strings.EqualFold(orderInfo.PaymentMethod, "CASH") {
 		return nil, ErrOrderNotPayable
 	}
-	// So sánh amount với tolerance ±1 để tránh floating-point issue.
-	// Order total_price là float64 (VND), payment amount là int64.
-	expectedAmount := int64(math.Round(orderInfo.TotalPrice))
+	// So sánh amount với tolerance ±1 để tránh lệch làm tròn giữa các service.
+	expectedAmount := orderInfo.TotalPrice
 	if diff := input.Amount - expectedAmount; diff < -1 || diff > 1 {
 		return nil, ErrAmountMismatch
 	}
@@ -325,7 +326,7 @@ func (s *paymentService) notifyOrderPaid(ctx context.Context, paymentID uuid.UUI
 		return
 	}
 
-	if err := s.orderClient.MarkOrderPaid(ctx, orderID); err != nil {
+	if err := s.orderClient.MarkOrderPaid(ctx, orderID, payment.Amount); err != nil {
 		// ErrOrderNotPayable is informational, not a system failure: it means
 		// the user (or admin) already moved the order off PENDING — most
 		// often a cancellation race. We log so ops can investigate possible

@@ -5,6 +5,7 @@ RUN apk add --no-cache git ca-certificates
 WORKDIR /workspace
 
 COPY go.mod go.sum ./
+COPY pkg/ ./pkg/
 COPY services/payment/go.mod services/payment/go.sum ./services/payment/
 
 WORKDIR /workspace/services/payment

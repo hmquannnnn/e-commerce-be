@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package order;
+
+option go_package = "github.com/hmquannnnn/e-commerce/pkg/proto/order;orderpb";
+
+service OrderService {
+  rpc GetOrder(GetOrderRequest) returns (OrderResponse);
+  rpc MarkOrderPaid(MarkPaidRequest) returns (MarkPaidResponse);
+  rpc TouchPaymentDeadline(TouchRequest) returns (TouchResponse);
+}
+
+message GetOrderRequest {
+  string order_id = 1;
+  string user_id = 2;
+}
+
+message OrderResponse {
+  string order_id = 1;
+  string user_id = 2;
+  int64 total_price = 3;
+  string status = 4;
+  string payment_method = 5;
+}
+
+message MarkPaidRequest {
+  string order_id = 1;
+  int64 amount = 2; // Compared with the order total using tolerance +-1 VND.
+}
+
+message MarkPaidResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message TouchRequest {
+  string order_id = 1;
+}
+
+message TouchResponse {
+  bool success = 1;
+}

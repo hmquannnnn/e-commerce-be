@@ -2,129 +2,134 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"time"
 
 	"github.com/google/uuid"
+	orderpb "github.com/hmquannnnn/e-commerce/pkg/proto/order"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
-// ErrOrderNotFound được trả về khi order-service báo 404.
 var ErrOrderNotFound = errors.New("order not found")
 
-// ErrOrderNotPayable trả về khi order-service từ chối transition (đơn đã bị
-// cancel / đã chuyển trạng thái khác PENDING). Caller nên log nhưng không retry.
+// ErrOrderNotPayable is returned when order-service refuses a payment action
+// because the order is no longer PENDING/payable.
 var ErrOrderNotPayable = errors.New("order not in a payable state")
 
-// OrderInfo là thông tin tối thiểu về order cần cho payment validation.
+var ErrOrderAmountMismatch = errors.New("order amount mismatch")
+
 type OrderInfo struct {
-	ID         uuid.UUID
-	UserID     uuid.UUID
-	TotalPrice float64
-	Status     string // "PENDING", "PAID", "DELIVERING", "DELIVERED", "CANCELLED"
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	TotalPrice    int64
+	Status        string
+	PaymentMethod string
 }
 
-// OrderClient định nghĩa interface giao tiếp với order-service.
 type OrderClient interface {
-	GetOrder(ctx context.Context, orderID uuid.UUID) (*OrderInfo, error)
-	// MarkOrderPaid yêu cầu order-service chuyển order PENDING → PAID.
-	// Returns ErrOrderNotPayable nếu order không còn ở PENDING (đã cancel, etc).
-	MarkOrderPaid(ctx context.Context, orderID uuid.UUID) error
+	GetOrder(ctx context.Context, orderID uuid.UUID, userID uuid.UUID) (*OrderInfo, error)
+	MarkOrderPaid(ctx context.Context, orderID uuid.UUID, amount int64) error
 	TouchPaymentDeadline(ctx context.Context, orderID uuid.UUID) error
+	Close() error
 }
 
 type orderClient struct {
-	baseURL    string
-	httpClient *http.Client
+	conn   *grpc.ClientConn
+	client orderpb.OrderServiceClient
 }
 
-// NewOrderClient tạo HTTP client gọi sang order-service.
-func NewOrderClient(baseURL string) OrderClient {
+func NewOrderClient(address string) (OrderClient, error) {
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to order-service grpc: %w", err)
+	}
 	return &orderClient{
-		baseURL: baseURL,
-		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
-		},
-	}
-}
-
-type orderInternalResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-	Data    struct {
-		ID         uuid.UUID `json:"id"`
-		UserID     uuid.UUID `json:"user_id"`
-		TotalPrice float64   `json:"total_price"`
-		Status     string    `json:"status"`
-	} `json:"data"`
-}
-
-func (c *orderClient) GetOrder(ctx context.Context, orderID uuid.UUID) (*OrderInfo, error) {
-	url := fmt.Sprintf("%s/internal/orders/%s", c.baseURL, orderID)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to call order-service: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrOrderNotFound
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("order-service returned status %d", resp.StatusCode)
-	}
-
-	var result orderInternalResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode order response: %w", err)
-	}
-
-	return &OrderInfo{
-		ID:         result.Data.ID,
-		UserID:     result.Data.UserID,
-		TotalPrice: result.Data.TotalPrice,
-		Status:     result.Data.Status,
+		conn:   conn,
+		client: orderpb.NewOrderServiceClient(conn),
 	}, nil
 }
 
-func (c *orderClient) MarkOrderPaid(ctx context.Context, orderID uuid.UUID) error {
-	url := fmt.Sprintf("%s/internal/orders/%s/mark-paid", c.baseURL, orderID)
-	return c.postOrderAction(ctx, url)
+func (c *orderClient) GetOrder(ctx context.Context, orderID uuid.UUID, userID uuid.UUID) (*OrderInfo, error) {
+	resp, err := c.client.GetOrder(ctx, &orderpb.GetOrderRequest{
+		OrderId: orderID.String(),
+		UserId:  userID.String(),
+	})
+	if err != nil {
+		return nil, mapOrderRPCError(err)
+	}
+
+	parsedOrderID, err := uuid.Parse(resp.GetOrderId())
+	if err != nil {
+		return nil, fmt.Errorf("order-service returned invalid order_id: %w", err)
+	}
+	parsedUserID, err := uuid.Parse(resp.GetUserId())
+	if err != nil {
+		return nil, fmt.Errorf("order-service returned invalid user_id: %w", err)
+	}
+
+	return &OrderInfo{
+		ID:            parsedOrderID,
+		UserID:        parsedUserID,
+		TotalPrice:    resp.GetTotalPrice(),
+		Status:        resp.GetStatus(),
+		PaymentMethod: resp.GetPaymentMethod(),
+	}, nil
+}
+
+func (c *orderClient) MarkOrderPaid(ctx context.Context, orderID uuid.UUID, amount int64) error {
+	resp, err := c.client.MarkOrderPaid(ctx, &orderpb.MarkPaidRequest{
+		OrderId: orderID.String(),
+		Amount:  amount,
+	})
+	if err != nil {
+		return mapOrderRPCError(err)
+	}
+	if !resp.GetSuccess() {
+		return fmt.Errorf("order-service mark paid failed: %s", resp.GetMessage())
+	}
+	return nil
 }
 
 func (c *orderClient) TouchPaymentDeadline(ctx context.Context, orderID uuid.UUID) error {
-	url := fmt.Sprintf("%s/internal/orders/%s/touch-payment-deadline", c.baseURL, orderID)
-	return c.postOrderAction(ctx, url)
+	resp, err := c.client.TouchPaymentDeadline(ctx, &orderpb.TouchRequest{
+		OrderId: orderID.String(),
+	})
+	if err != nil {
+		return mapOrderRPCError(err)
+	}
+	if !resp.GetSuccess() {
+		return fmt.Errorf("order-service touch payment deadline failed")
+	}
+	return nil
 }
 
-func (c *orderClient) postOrderAction(ctx context.Context, url string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to call order-service: %w", err)
-	}
-	defer resp.Body.Close()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
+func (c *orderClient) Close() error {
+	if c.conn == nil {
 		return nil
-	case http.StatusNotFound:
+	}
+	return c.conn.Close()
+}
+
+func mapOrderRPCError(err error) error {
+	st, ok := status.FromError(err)
+	if !ok {
+		return fmt.Errorf("order-service grpc call failed: %w", err)
+	}
+
+	switch st.Code() {
+	case codes.NotFound:
 		return ErrOrderNotFound
-	case http.StatusConflict:
+	case codes.FailedPrecondition:
+		if st.Message() == "order amount mismatch" {
+			return ErrOrderAmountMismatch
+		}
 		return ErrOrderNotPayable
+	case codes.PermissionDenied:
+		return ErrOrderNotFound
 	default:
-		return fmt.Errorf("order-service returned status %d", resp.StatusCode)
+		return fmt.Errorf("order-service grpc call failed: %w", err)
 	}
 }

@@ -48,10 +48,15 @@ func main() {
 		slog.Error("failed to init PayOS provider", "error", err)
 		os.Exit(1)
 	}
-	orderClient := client.NewOrderClient(cfg.OrderServiceURL)
+	orderClient, err := client.NewOrderClient(cfg.OrderServiceGRPCAddress)
+	if err != nil {
+		slog.Error("failed to create order-service grpc client", "error", err)
+		os.Exit(1)
+	}
+	defer orderClient.Close()
 	paymentSvc := service.NewPaymentService(repo, payosProvider, orderClient)
 
-	slog.Info("order-service client configured", "url", cfg.OrderServiceURL)
+	slog.Info("order-service grpc client configured", "address", cfg.OrderServiceGRPCAddress)
 
 	router := routes.NewRouter(paymentSvc)
 	engine := router.SetupRoutes()

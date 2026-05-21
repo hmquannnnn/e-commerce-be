@@ -14,7 +14,7 @@ API Gateway  (port 8080)
     │  inject X-User-ID / X-User-Role / X-User-Email
     ▼
 Payment Service  (port 8086)
-    ├── Order Service (internal HTTP, port 8085)  ← validate order
+    ├── Order Service (gRPC, port 9085)  ← validate order / mark paid
     └── PayOS API    (HTTPS, payment link + webhook)
          │
          ▼
@@ -76,11 +76,14 @@ Service.CreatePayment
     ├─ Currency: default "VND"
     │
     ▼
-Order validation → GET {ORDER_SERVICE_URL}/internal/orders/{order_id}
+Order validation → gRPC OrderService.GetOrder(order_id, user_id)
     ├─ 404 → ErrOrderNotFound
     ├─ order.user_id ≠ caller → ErrForbidden
-    ├─ order.status ≠ "PENDING" → ErrOrderNotPayable
-    └─ |round(total_price) - amount| > 1 → ErrAmountMismatch
+    ├─ order.status ≠ "PENDING" hoặc payment_method = "CASH" → ErrOrderNotPayable
+    └─ |total_price - amount| > 1 → ErrAmountMismatch
+    │
+    ▼
+Touch deadline → gRPC OrderService.TouchPaymentDeadline(order_id)
     │
     ▼
 NextPayosOrderCode → SELECT nextval('payos_order_code_seq')
@@ -129,7 +132,7 @@ Repository.ApplyCallback (1 transaction)
     └─ INSERT payment_attempts (attempt_no=999)
     │
     ▼
-notifyOrderPaid → POST /internal/orders/{id}/mark-paid
+notifyOrderPaid → gRPC OrderService.MarkOrderPaid(order_id, amount)
     │
     ▼
 200 OK { success: true }
@@ -210,7 +213,7 @@ PayOS yêu cầu `orderCode` là `int64`, hệ thống dùng UUID.
 | `PAYOS_CHECKSUM_KEY` | `secret` | Checksum key để verify webhook |
 | `PAYOS_RETURN_URL` | `http://localhost:3000/en/payment/result?state=success` | FE URL sau thanh toán thành công |
 | `PAYOS_CANCEL_URL` | `http://localhost:3000/en/payment/result?state=cancel` | FE URL khi user hủy |
-| `ORDER_SERVICE_URL` | `http://order-service:8085` | URL nội bộ order-service |
+| `ORDER_SERVICE_GRPC_ADDRESS` | `order-service:9085` | gRPC address nội bộ order-service |
 
 ### Webhook setup (local development)
 

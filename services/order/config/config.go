@@ -17,6 +17,7 @@ type AppConfig struct {
 	Name               string
 	Environment        string
 	Port               string
+	GRPCPort           string
 	OrderExpiryEnabled bool
 }
 
@@ -32,7 +33,8 @@ type DatabaseConfig struct {
 }
 
 type ProductServiceConfig struct {
-	URL string
+	URL         string
+	GRPCAddress string
 }
 
 type UserServiceConfig struct {
@@ -45,6 +47,7 @@ func Load() (*Config, error) {
 			Name:               getEnv("APP_NAME", "order-service"),
 			Environment:        getEnv("APP_ENV", "development"),
 			Port:               getEnv("APP_PORT", "8085"),
+			GRPCPort:           getEnv("GRPC_PORT", "9085"),
 			OrderExpiryEnabled: getEnvAsBool("ORDER_EXPIRY_WORKER_ENABLED", true),
 		},
 		Database: DatabaseConfig{
@@ -58,7 +61,8 @@ func Load() (*Config, error) {
 			MaxIdle:  getEnvAsInt("DB_MAX_IDLE", 10),
 		},
 		ProductSvc: ProductServiceConfig{
-			URL: getEnv("PRODUCT_SERVICE_URL", "http://localhost:8083"),
+			URL:         getEnv("PRODUCT_SERVICE_URL", "http://localhost:8083"),
+			GRPCAddress: getEnv("PRODUCT_SERVICE_GRPC_ADDRESS", "localhost:9083"),
 		},
 		UserSvc: UserServiceConfig{
 			URL: getEnv("USER_SERVICE_URL", "http://localhost:8081"),
@@ -84,6 +88,9 @@ func (c *Config) Validate() error {
 	}
 	if c.ProductSvc.URL == "" {
 		return fmt.Errorf("PRODUCT_SERVICE_URL is required")
+	}
+	if c.ProductSvc.GRPCAddress == "" {
+		return fmt.Errorf("PRODUCT_SERVICE_GRPC_ADDRESS is required")
 	}
 	if c.UserSvc.URL == "" {
 		return fmt.Errorf("USER_SERVICE_URL is required")

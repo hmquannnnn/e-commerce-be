@@ -28,6 +28,6 @@ WORKDIR /app
 
 COPY --from=builder /bin/product-service .
 
-EXPOSE 8083
+EXPOSE 8083 9083
 
 CMD ["./product-service"]

@@ -24,6 +24,7 @@ type ProductRepository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 	AddImage(ctx context.Context, productID uuid.UUID, url string, displayOrder int, isPrimary bool) (*model.ProductImage, error)
 	DeleteImage(ctx context.Context, imageID uuid.UUID) error
+	CountByCategory(ctx context.Context, categoryID int) (int64, error)
 }
 
 type productRepository struct {
@@ -270,4 +271,15 @@ func (r *productRepository) DeleteImage(ctx context.Context, imageID uuid.UUID) 
 		return errors.New("image not found")
 	}
 	return nil
+}
+
+func (r *productRepository) CountByCategory(ctx context.Context, categoryID int) (int64, error) {
+	var count int64
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM products WHERE category_id = $1`, categoryID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count products by category: %w", err)
+	}
+	return count, nil
 }

@@ -14,7 +14,9 @@ type InventoryService interface {
 	GetInventory(ctx context.Context, productID uuid.UUID) (*model.Inventory, error)
 	UpdateStock(ctx context.Context, productID uuid.UUID, stockQuantity int) (*model.Inventory, error)
 	ReserveStock(ctx context.Context, productID uuid.UUID, quantity int) error
+	ReserveStockBatch(ctx context.Context, items []model.ReserveStockParams) error
 	ReleaseStock(ctx context.Context, productID uuid.UUID, quantity int) error
+	ReleaseStockBatch(ctx context.Context, items []model.ReleaseStockParams) error
 }
 
 type inventoryService struct {
@@ -73,6 +75,28 @@ func (s *inventoryService) ReserveStock(ctx context.Context, productID uuid.UUID
 	return nil
 }
 
+func (s *inventoryService) ReserveStockBatch(ctx context.Context, items []model.ReserveStockParams) error {
+	if len(items) == 0 {
+		return ErrInvalidInput
+	}
+	for _, item := range items {
+		if item.ProductID == uuid.Nil || item.Quantity <= 0 {
+			return ErrInvalidInput
+		}
+	}
+
+	if err := s.repo.ReserveStocks(ctx, items); err != nil {
+		if errors.Is(err, repository.ErrInsufficientStock) {
+			return ErrInsufficientStock
+		}
+		if errors.Is(err, repository.ErrInventoryNotFound) {
+			return ErrInventoryNotFound
+		}
+		return fmt.Errorf("failed to reserve stock batch: %w", err)
+	}
+	return nil
+}
+
 func (s *inventoryService) ReleaseStock(ctx context.Context, productID uuid.UUID, quantity int) error {
 	if quantity <= 0 {
 		return ErrInvalidInput
@@ -86,6 +110,25 @@ func (s *inventoryService) ReleaseStock(ctx context.Context, productID uuid.UUID
 			return ErrInventoryNotFound
 		}
 		return fmt.Errorf("failed to release stock: %w", err)
+	}
+	return nil
+}
+
+func (s *inventoryService) ReleaseStockBatch(ctx context.Context, items []model.ReleaseStockParams) error {
+	if len(items) == 0 {
+		return ErrInvalidInput
+	}
+	for _, item := range items {
+		if item.ProductID == uuid.Nil || item.Quantity <= 0 {
+			return ErrInvalidInput
+		}
+	}
+
+	if err := s.repo.ReleaseStocks(ctx, items); err != nil {
+		if errors.Is(err, repository.ErrInventoryNotFound) {
+			return ErrInventoryNotFound
+		}
+		return fmt.Errorf("failed to release stock batch: %w", err)
 	}
 	return nil
 }

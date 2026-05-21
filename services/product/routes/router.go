@@ -81,13 +81,6 @@ func (r *Router) SetupRoutes() *gin.Engine {
 			inventory.PATCH("/:product_id/stock", r.inventoryHandler.UpdateStock)
 		}
 
-		// Internal stock management (order-service → product-service). No X-User-ID: not a user request.
-		// Expose only on trusted network (e.g. cluster internal / localhost dev).
-		internal := v1.Group("/internal/inventory")
-		{
-			internal.POST("/reserve", r.inventoryHandler.ReserveStock)
-			internal.POST("/release", r.inventoryHandler.ReleaseStock)
-		}
 	}
 
 	return router

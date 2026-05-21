@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +8,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	inventorypb "github.com/hmquannnnn/e-commerce/pkg/proto/inventory"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 type ProductInfo struct {
@@ -25,22 +29,31 @@ type InventoryItem struct {
 
 type ProductClient interface {
 	GetProduct(ctx context.Context, productID uuid.UUID) (*ProductInfo, error)
-	ReserveInventory(ctx context.Context, item InventoryItem) error
-	ReleaseInventory(ctx context.Context, item InventoryItem) error
+	ReserveInventory(ctx context.Context, items []InventoryItem) error
+	ReleaseInventory(ctx context.Context, items []InventoryItem) error
+	Close() error
 }
 
 type productClient struct {
-	baseURL    string
-	httpClient *http.Client
+	baseURL         string
+	httpClient      *http.Client
+	inventoryConn   *grpc.ClientConn
+	inventoryClient inventorypb.InventoryServiceClient
 }
 
-func NewProductClient(baseURL string) ProductClient {
+func NewProductClient(baseURL, inventoryAddress string) (ProductClient, error) {
+	conn, err := grpc.Dial(inventoryAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to product-service inventory grpc: %w", err)
+	}
 	return &productClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-	}
+		inventoryConn:   conn,
+		inventoryClient: inventorypb.NewInventoryServiceClient(conn),
+	}, nil
 }
 
 type productDetailResponse struct {
@@ -104,42 +117,65 @@ func (c *productClient) GetProduct(ctx context.Context, productID uuid.UUID) (*P
 	return info, nil
 }
 
-func (c *productClient) ReserveInventory(ctx context.Context, item InventoryItem) error {
-	return c.callInventory(ctx, "/api/internal/inventory/reserve", item)
-}
+func (c *productClient) ReserveInventory(ctx context.Context, items []InventoryItem) error {
+	if len(items) == 0 {
+		return nil
+	}
 
-func (c *productClient) ReleaseInventory(ctx context.Context, item InventoryItem) error {
-	return c.callInventory(ctx, "/api/internal/inventory/release", item)
-}
-
-func (c *productClient) callInventory(ctx context.Context, path string, item InventoryItem) error {
-	body, err := json.Marshal(item)
+	resp, err := c.inventoryClient.ReserveStock(ctx, &inventorypb.ReserveRequest{
+		Items: toProtoItems(items),
+	})
 	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
+		return mapInventoryRPCError(err)
 	}
-
-	url := c.baseURL + path
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+	if !resp.GetSuccess() {
+		return fmt.Errorf("product-service inventory reserve failed: %s", resp.GetMessage())
 	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to call product-service: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusConflict {
-		return ErrInsufficientStock
-	}
-	if resp.StatusCode == http.StatusNotFound {
-		return ErrProductNotFound
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("product-service inventory call returned status %d", resp.StatusCode)
-	}
-
 	return nil
+}
+
+func (c *productClient) ReleaseInventory(ctx context.Context, items []InventoryItem) error {
+	if len(items) == 0 {
+		return nil
+	}
+
+	resp, err := c.inventoryClient.ReleaseStock(ctx, &inventorypb.ReleaseRequest{
+		Items: toProtoItems(items),
+	})
+	if err != nil {
+		return mapInventoryRPCError(err)
+	}
+	if !resp.GetSuccess() {
+		return fmt.Errorf("product-service inventory release failed: %s", resp.GetMessage())
+	}
+	return nil
+}
+
+func (c *productClient) Close() error {
+	if c.inventoryConn == nil {
+		return nil
+	}
+	return c.inventoryConn.Close()
+}
+
+func toProtoItems(items []InventoryItem) []*inventorypb.OrderItem {
+	result := make([]*inventorypb.OrderItem, 0, len(items))
+	for _, item := range items {
+		result = append(result, &inventorypb.OrderItem{
+			ProductId: item.ProductID.String(),
+			Quantity:  int32(item.Quantity),
+		})
+	}
+	return result
+}
+
+func mapInventoryRPCError(err error) error {
+	switch status.Code(err) {
+	case codes.NotFound:
+		return ErrProductNotFound
+	case codes.FailedPrecondition:
+		return ErrInsufficientStock
+	default:
+		return fmt.Errorf("product-service inventory grpc call failed: %w", err)
+	}
 }

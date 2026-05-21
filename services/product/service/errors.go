@@ -5,6 +5,7 @@ import "errors"
 var (
 	ErrCategoryNotFound      = errors.New("category not found")
 	ErrCategoryAlreadyExists = errors.New("category already exists")
+	ErrCategoryHasProducts   = errors.New("category has products")
 	ErrProductNotFound       = errors.New("product not found")
 	ErrInventoryNotFound     = errors.New("inventory not found")
 	ErrInsufficientStock     = errors.New("insufficient stock")
