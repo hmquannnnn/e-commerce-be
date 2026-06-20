@@ -23,6 +23,7 @@ services:
       timeout: 5s
       retries: 5
 
+  # PostgreSQL for Product Service
   postgres-product:
     image: postgres:15-alpine
     container_name: uav-store-postgres-product
@@ -44,6 +45,50 @@ services:
       timeout: 5s
       retries: 5
 
+  # PostgreSQL for Order Service
+  postgres-order:
+    image: postgres:15-alpine
+    container_name: uav-store-postgres-order
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres-order-data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d
+    networks:
+      - uav-store-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL for Payment Service
+  postgres-payment:
+    image: postgres:15-alpine
+    container_name: uav-store-postgres-payment
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres-payment-data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d
+    networks:
+      - uav-store-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   minio:
     image: minio/minio:latest
     container_name: uav-store-minio
@@ -56,12 +101,18 @@ services:
     volumes:
       - ~/minio/data:/data
     command: server /data --console-address ":9001"
+    networks:
+      - uav-store-network
 
 
 volumes:
   postgres-user-data:
     driver: local
   postgres-product-data:
+    driver: local
+  postgres-order-data:
+    driver: local
+  postgres-payment-data:
     driver: local
 
 networks:
