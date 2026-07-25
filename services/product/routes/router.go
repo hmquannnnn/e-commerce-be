@@ -4,8 +4,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hmquannnnn/e-commerce/pkg/metrics"
 	"github.com/hmquannnnn/e-commerce/product-service/handler"
 	"github.com/hmquannnnn/e-commerce/product-service/service"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Router struct {
@@ -30,6 +32,9 @@ func (r *Router) SetupRoutes() *gin.Engine {
 	router := gin.Default()
 
 	router.Use(RequestIDMiddleware())
+
+	router.Use(metrics.Middleware())
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	router.GET("/health", r.healthCheck)
 	router.GET("/api/health", r.healthCheck)
