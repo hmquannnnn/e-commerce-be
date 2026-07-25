@@ -6,6 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hmquannnnn/e-commerce/api-gateway/internal/middleware"
 	"github.com/hmquannnnn/e-commerce/api-gateway/internal/proxy"
+	"github.com/hmquannnnn/e-commerce/pkg/metrics"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // SetupRouter configures all routes for the API Gateway
@@ -14,6 +16,8 @@ func SetupRouter(userServiceURL string, fileServiceURL string, productServiceURL
 
 	// Global middlewares
 	r.Use(middleware.CORSMiddleware())
+	r.Use(metrics.Middleware())
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// Health check endpoint
 	r.GET("/health", healthCheck)
