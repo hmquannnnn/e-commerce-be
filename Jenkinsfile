@@ -85,7 +85,7 @@ pipeline {
                     when { expression { return env.BUILD_API_GATEWAY == 'true' } }
                     agent {
                         docker {
-                            image 'golang:1.24-alpine'
+                            image 'golang:1.25-alpine'
                             args  '-u root'
                             reuseNode true
                         }
