@@ -102,7 +102,7 @@ pipeline {
                     when { expression { return env.BUILD_USER == 'true' } }
                     agent {
                         docker {
-                            image 'golang:1.24-alpine'
+                            image 'golang:1.25-alpine'
                             args  '-u root'
                             reuseNode true
                         }
@@ -119,7 +119,7 @@ pipeline {
                     when { expression { return env.BUILD_FILE == 'true' } }
                     agent {
                         docker {
-                            image 'golang:1.24-alpine'
+                            image 'golang:1.25-alpine'
                             args  '-u root'
                             reuseNode true
                         }
@@ -136,7 +136,7 @@ pipeline {
                     when { expression { return env.BUILD_PRODUCT == 'true' } }
                     agent {
                         docker {
-                            image 'golang:1.24-alpine'
+                            image 'golang:1.25-alpine'
                             args  '-u root'
                             reuseNode true
                         }
@@ -153,7 +153,7 @@ pipeline {
                     when { expression { return env.BUILD_ORDER == 'true' } }
                     agent {
                         docker {
-                            image 'golang:1.24-alpine'
+                            image 'golang:1.25-alpine'
                             args  '-u root'
                             reuseNode true
                         }
@@ -170,7 +170,7 @@ pipeline {
                     when { expression { return env.BUILD_PAYMENT == 'true' } }
                     agent {
                         docker {
-                            image 'golang:1.24-alpine'
+                            image 'golang:1.25-alpine'
                             args  '-u root'
                             reuseNode true
                         }
@@ -188,7 +188,7 @@ pipeline {
         stage('Docker Build & Push') {
             agent {
                 docker {
-                    image 'docker:24-cli'
+                    image 'docker:25-cli'
                     args  "--entrypoint='' -v /var/run/docker.sock:/var/run/docker.sock -u root"
                     reuseNode true
                 }
