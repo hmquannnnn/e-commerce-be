@@ -2,14 +2,19 @@ FROM golang:1.25-alpine AS builder
 
 RUN apk add --no-cache git ca-certificates
 
-WORKDIR /app
+WORKDIR /workspace
 
 COPY go.mod go.sum ./
+COPY pkg/ ./pkg/
+
+COPY api-gateway/go.mod api-gateway/go.sum ./api-gateway/
+WORKDIR /workspace/api-gateway
 RUN go mod download
 
-COPY . .
-
-RUN go build -o /bin/api-gateway main.go
+WORKDIR /workspace
+COPY api-gateway/ ./api-gateway/
+WORKDIR /workspace/api-gateway
+RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o /bin/api-gateway main.go
 
 FROM alpine:3.20
 

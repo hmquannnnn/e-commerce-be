@@ -93,7 +93,7 @@ pipeline {
                     def user = env.DOCKERHUB_USER
 
                     def services = [
-                        [build: env.BUILD_API_GATEWAY == 'true', name: 'api-gateway',     dockerfile: 'api-gateway/Dockerfile',      context: 'api-gateway'],
+                        [build: env.BUILD_API_GATEWAY == 'true', name: 'api-gateway',     dockerfile: 'api-gateway/Dockerfile',      context: '.'],
                         [build: env.BUILD_USER == 'true',        name: 'user-service',    dockerfile: 'services/user/Dockerfile',    context: '.'],
                         [build: env.BUILD_FILE == 'true',     name: 'file-service',    dockerfile: 'services/file/Dockerfile',    context: '.'],
                         [build: env.BUILD_PRODUCT == 'true',     name: 'product-service', dockerfile: 'services/product/Dockerfile', context: '.'],
@@ -108,24 +108,22 @@ pipeline {
                     )]) {
                         sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
 
-                        def buildTasks = [:]
+                        def anyBuilt = false
                         services.each { svc ->
                             if (svc.build) {
-                                def s = svc
-                                buildTasks[s.name] = {
-                                    def img = "${user}/${s.name}"
-                                    sh "docker pull ${img}:latest || true"
-                                    sh "docker build --cache-from ${img}:latest -f ${s.dockerfile} -t ${img}:latest -t ${img}:${sha} ${s.context}"
-                                    sh "docker push ${img}:latest"
-                                    sh "docker push ${img}:${sha}"
-                                    echo "Pushed ${img}:latest and ${img}:${sha}"
-                                }
+                                anyBuilt = true
+
+                                echo "===== Building ${svc.name} ====="
+                                def img = "${user}/${svc.name}"
+                                sh "docker pull ${img}:latest || true"
+                                sh "docker build --cache-from ${img}:latest -f ${svc.dockerfile} -t ${img}:latest -t ${img}:${sha} ${svc.context}"
+                                sh "docker push ${img}:latest"
+                                sh "docker push ${img}:${sha}"
+                                echo "Pushed ${img}:latest and ${img}:${sha}"
                             }
                         }
 
-                        if (buildTasks) {
-                            parallel buildTasks
-                        } else {
+                        if (!anyBuilt) {
                             echo 'No services changed — skipping Docker build'
                         }
 
