@@ -1,10 +1,10 @@
 # =============================================================================
 # STAGE 1: Builder
 # =============================================================================
-# Dùng golang:1.24-alpine thay vì golang:1.24 (debian) vì:
+# Dùng golang:1.25-alpine thay vì golang:1.25 (debian) vì:
 #   - alpine nhỏ hơn ~700MB so với ~900MB
 #   - đủ tool để build Go (gcc, musl-libc)
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Cài git vì `go mod download` có thể cần clone một số dependency từ VCS.
 # ca-certificates cần cho HTTPS khi download module.
