@@ -142,13 +142,16 @@ pipeline {
                     def branch = env.GITOPS_BRANCH
                     def gitopsRepo = env.GITOPS_REPO
 
+                    // Helm values: mỗi service là 1 top-level key trùng tên (alias subchart),
+                    // với image.repository + image.tag. Chỉ cần cập nhật tag theo GIT_SHA.
+                    def valuesFile = 'helm/uav-store/values.yaml'
                     def serviceMappings = [
-                        [build: env.BUILD_API_GATEWAY == 'true', name: 'api-gateway',     yaml: 'deployment/k8s/07-api-gateway.yaml'],
-                        [build: env.BUILD_USER == 'true',        name: 'user-service',    yaml: 'deployment/k8s/06-user-service.yaml'],
-                        [build: env.BUILD_FILE == 'true',        name: 'file-service',    yaml: 'deployment/k8s/10-file-service.yaml'],
-                        [build: env.BUILD_PRODUCT == 'true',     name: 'product-service', yaml: 'deployment/k8s/11-product-service.yaml'],
-                        [build: env.BUILD_ORDER == 'true',       name: 'order-service',   yaml: 'deployment/k8s/14-order-service.yaml'],
-                        [build: env.BUILD_PAYMENT == 'true',     name: 'payment-service', yaml: 'deployment/k8s/17-payment-service.yaml'],
+                        [build: env.BUILD_API_GATEWAY == 'true', name: 'api-gateway'],
+                        [build: env.BUILD_USER == 'true',        name: 'user-service'],
+                        [build: env.BUILD_FILE == 'true',        name: 'file-service'],
+                        [build: env.BUILD_PRODUCT == 'true',     name: 'product-service'],
+                        [build: env.BUILD_ORDER == 'true',       name: 'order-service'],
+                        [build: env.BUILD_PAYMENT == 'true',     name: 'payment-service'],
                     ]
 
                     def updated = false
@@ -172,7 +175,9 @@ pipeline {
 
                             serviceMappings.each { svc ->
                                 if (svc.build) {
-                                    sh "sed -i 's|image: .*${svc.name}.*|image: ${user}/${svc.name}:${sha}|g' ${gitopsDir}/${svc.yaml}"
+                                    // Chỉ đổi dòng `tag:` NẰM TRONG block của service (từ dòng
+                                    // `<name>:` ở cột 0 tới key cột-0 kế tiếp) → không đụng tag service khác.
+                                    sh """sed -i '/^${svc.name}:/,/^[^[:space:]]/{s|^\\(\\s*\\)tag:.*|\\1tag: "${sha}"|}' ${gitopsDir}/${valuesFile}"""
                                 }
                             }
 
@@ -181,7 +186,7 @@ pipeline {
                                 git config user.email "jenkins@uav-store"
                                 git config user.name "Jenkins"
 
-                                git add deployment/k8s/
+                                git add ${valuesFile}
                                 git diff --staged --quiet || git commit -m "ci: update image tags to ${sha} [ci skip]"
 
                                 git pull --rebase origin ${branch}
