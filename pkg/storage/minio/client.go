@@ -18,7 +18,14 @@ type Client struct {
 }
 
 func NewClient(config Config) (*Client, error) {
-	creds := credentials.NewStaticV4(config.AccessKey, config.SecretAccessKey, "")
+	// "iam": chạy trên AWS — lấy credential TẠM từ IAM role của EC2 qua IMDS,
+	// không cần access key tĩnh. "static" (mặc định): MinIO/local dùng key như cũ.
+	var creds *credentials.Credentials
+	if config.AuthType == "iam" {
+		creds = credentials.NewIAM("")
+	} else {
+		creds = credentials.NewStaticV4(config.AccessKey, config.SecretAccessKey, "")
+	}
 
 	minioClient, err := minio.New(config.Endpoint, &minio.Options{
 		Creds:  creds,
@@ -44,8 +51,8 @@ func NewClient(config Config) (*Client, error) {
 		return nil, fmt.Errorf("failed to create Minio presign client: %w", err)
 	}
 
-	log.Printf("[minio] client init — Endpoint=%q  PublicEndpoint=%q  presignEndpoint=%q  UseSSL=%v  Region=%q",
-		config.Endpoint, config.PublicEndpoint, presignEndpoint, config.UseSSL, config.Region)
+	log.Printf("[minio] client init — Endpoint=%q  PublicEndpoint=%q  presignEndpoint=%q  UseSSL=%v  Region=%q  AuthType=%q",
+		config.Endpoint, config.PublicEndpoint, presignEndpoint, config.UseSSL, config.Region, config.AuthType)
 
 	return &Client{
 		client:        minioClient,

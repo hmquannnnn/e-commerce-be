@@ -11,6 +11,7 @@ type Config struct {
 	SecretAccessKey string
 	UseSSL          bool
 	Region          string
+	AuthType        string // "static" (access key — MinIO/local) | "iam" (AWS S3 — credential tạm từ IAM role qua IMDS)
 }
 
 func NewConfigFromEnv() Config {
@@ -22,6 +23,7 @@ func NewConfigFromEnv() Config {
 		SecretAccessKey: getEnv("MINIO_SECRET_KEY", "minio123"),
 		UseSSL:          getEnvAsBool("MINIO_USE_SSL", false),
 		Region:          getEnv("MINIO_REGION", "us-east-1"),
+		AuthType:        getEnv("MINIO_AUTH_TYPE", "static"),
 	}
 }
 

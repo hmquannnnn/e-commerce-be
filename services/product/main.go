@@ -62,6 +62,8 @@ func runServer() {
 		AccessKey:       cfg.MinIO.AccessKey,
 		SecretAccessKey: cfg.MinIO.SecretAccessKey,
 		UseSSL:          cfg.MinIO.UseSSL,
+		Region:          cfg.MinIO.Region,
+		AuthType:        cfg.MinIO.AuthType,
 	})
 	if err != nil {
 		log.Printf("Warning: failed to connect to MinIO: %v — folder auto-creation disabled", err)

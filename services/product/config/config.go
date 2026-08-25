@@ -18,6 +18,8 @@ type MinIOConfig struct {
 	SecretAccessKey string
 	UseSSL          bool
 	BucketName      string
+	Region          string
+	AuthType        string // "static" | "iam" — xem pkg/storage/minio
 }
 
 type AppConfig struct {
@@ -62,6 +64,8 @@ func Load() (*Config, error) {
 			SecretAccessKey: getEnv("MINIO_SECRET_KEY", "minio123"),
 			UseSSL:          getEnvAsBool("MINIO_USE_SSL", false),
 			BucketName:      getEnv("STORAGE_BUCKET_NAME", "uav-store"),
+			Region:          getEnv("MINIO_REGION", "us-east-1"),
+			AuthType:        getEnv("MINIO_AUTH_TYPE", "static"),
 		},
 	}
 
